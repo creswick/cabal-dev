@@ -1,6 +1,7 @@
 Name:                cabal-dev
 Version:             0.1
-Synopsis:            Tool for managing development builds of Haskell projects that consist of multiple not-yet-released cabal packagges
+Synopsis:            Manage projects with several development cabal packages
+Description:         Tool for managing development builds of Haskell projects that consist of multiple not-yet-released cabal packagges
 -- Description:
 
 License:             BSD3
@@ -10,7 +11,7 @@ Maintainer:          j3h@galois.com
 Copyright:           2010 Galois, Inc.
 Category:            Development
 Build-type:          Simple
-Cabal-version:       >=1.2
+Cabal-version:       >=1.6
 Executable cabal-dev
   HS-Source-Dirs: src
   Main-is: Main.hs
@@ -28,6 +29,7 @@ Executable cabal-dev
     Cabal >= 1.6 && < 1.9,
     directory == 1.0.*,
     filepath == 1.1.*,
+    process == 1.0.*,
     tar == 0.3.*,
     zlib == 0.5.*
   -- Other-modules:
