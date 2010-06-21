@@ -58,10 +58,6 @@ mkRepo flgs fns = do
   writeIndex localRepo newIndex
   return CommandOk
 
--- |The name of the cabal-install package index
-indexTar :: FilePath
-indexTar = "00-index.tar"
-
 -- |Atomically write an index tarball in the supplied directory
 writeIndex :: LocalRepository -- ^The local repository path
            -> [T.Entry] -- ^The index entries
@@ -69,10 +65,10 @@ writeIndex :: LocalRepository -- ^The local repository path
 writeIndex localRepo ents =
     do newIndexName <- withTmpIndex $ \(fn, h) ->
                        L.hPut h (T.write ents) >> return fn
-       renameFile newIndexName (pth </> indexTar)
+       renameFile newIndexName $ indexTar localRepo
     where
       pth = localRepoPath localRepo
-      withTmpIndex = bracket (openTempFile pth indexTar) (hClose . snd)
+      withTmpIndex = bracket (openTempFile pth indexTarBase) (hClose . snd)
 
 -- |Merge two lists of tar entries, filtering out the entries from the
 -- original list that will be duplicated by the second list of
@@ -82,13 +78,6 @@ mergeIndices old new = filter notInNew old ++ new
     where
       newPaths = map T.entryTarPath new
       notInNew e = not $ T.entryTarPath e `elem` newPaths
-
--- |Does this filename look like a gzipped tarball?
-isTarball :: FilePath -> Bool
-isTarball fn = (ext2, ext1) == (".tar", ".gz")
-    where
-      (fn1, ext1) = splitExtension fn
-      (_, ext2) = splitExtension fn1
 
 -- |Create a tar entry for the package identifier and cabal file contents
 toIndexEntry :: PackageIdentifier -> L.ByteString -> Either String T.Entry
@@ -103,14 +92,17 @@ readExistingIndex :: LocalRepository -> IO [T.Entry]
 readExistingIndex localRepo =
     catchJust (guard . isDoesNotExistError) readIndexFile (const $ return [])
     where
-      readIndexFile = withFile (localRepoPath localRepo </> indexTar) ReadMode
+      readIndexFile = withFile (indexTar localRepo) ReadMode
                       (forceEntries . T.read <=< L.hGetContents)
       forceEntries es = do
         let es' = T.foldEntries (:) [] error es
         length es' `seq` return es'
 
+-- |What kind of package source is this?
 data LocalSource = DirPkg | TarPkg
 
+-- |Determine if this filename looks like a tarball (otherwise, it
+-- assumes that it's a directory and treats it as such)
 classifyLocalSource :: FilePath -> LocalSource
 classifyLocalSource fn | isTarball fn = TarPkg
                        | otherwise    = DirPkg
@@ -186,6 +178,7 @@ processDirectory d = do
 forceBS :: L.ByteString -> IO ()
 forceBS bs = L.length bs `seq` return ()
 
+-- |Force a lazy ByteString to be read, and pass it on to the next action
 forcedBS :: L.ByteString -> IO L.ByteString
 forcedBS bs = forceBS bs >> return bs
 
@@ -209,8 +202,16 @@ extractCabalFile = T.foldEntries step Nothing (const Nothing)
                        T.NormalFile x _ -> return x
                        _ -> Nothing
 
+-- | Does this filename look like a cabal file?
 isCabalFile :: FilePath -> Bool
 isCabalFile = (== ".cabal") . takeExtension
+
+-- |Does this filename look like a gzipped tarball?
+isTarball :: FilePath -> Bool
+isTarball fn = (ext2, ext1) == (".tar", ".gz")
+    where
+      (fn1, ext1) = splitExtension fn
+      (_, ext2) = splitExtension fn1
 
 -- |The path to the .cabal file in the 00-index.tar file
 indexName :: PackageIdentifier -> FilePath
@@ -223,3 +224,10 @@ tarballName pkgId = repoDir pkgId </> (display pkgId <.> "tar" <.> "gz")
 repoDir :: PackageIdentifier -> FilePath
 repoDir pkgId = display (pkgName pkgId) </>
                 display (pkgVersion pkgId)
+
+-- |The name of the cabal-install package index
+indexTarBase :: FilePath
+indexTarBase = "00-index.tar"
+
+indexTar :: LocalRepository -> FilePath
+indexTar lr = localRepoPath lr </> indexTarBase
