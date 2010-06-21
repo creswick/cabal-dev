@@ -26,12 +26,12 @@ import qualified Distribution.Verbosity as V
 
 import Distribution.Dev.Command ( CommandActions(..), CommandResult(..) )
 import Distribution.Dev.Flags ( GlobalFlag )
-import Distribution.Dev.LocalRepo ( resolveLocalRepo )
+import Distribution.Dev.LocalRepo ( resolveLocalRepo, localRepoPath, LocalRepository )
 import qualified Distribution.Dev.Log as Log
 
 actions :: CommandActions
 actions = CommandActions
-            { cmdDesc = "Create a new repository from cabal package sources"
+            { cmdDesc = "Add packages to a local cabal install repository"
             , cmdRun = \flgs _ -> mkRepo flgs
             , cmdOpts = [] :: [OptDescr ()]
             }
@@ -40,8 +40,8 @@ mkRepo :: [GlobalFlag] -> [String] -> IO CommandResult
 mkRepo _    [] = return $ CommandError "No local package locations supplied"
 mkRepo flgs fns = do
   localRepo <- resolveLocalRepo flgs
-  Log.debug flgs $
-         "Making a cabal repo in " ++ localRepo ++ " out of " ++ show fns
+  Log.debug flgs $ "Making a cabal repo in " ++ localRepoPath localRepo ++
+         " out of " ++ show fns
   (sources, newEntries) <- unzip `fmap` mapM processLocalSource fns
   existingIndex <- readExistingIndex localRepo
   let newIndex = mergeIndices existingIndex newEntries
@@ -51,22 +51,28 @@ mkRepo flgs fns = do
   -- package (or at least a .cabal file)
   --
   -- Now to install the tarballs for the directories:
-  forM_ (zip sources fns) $ \((src, pkgId), fn) -> installTarball localRepo src pkgId fn
+  forM_ (zip sources fns) $ \((src, pkgId), fn) ->
+      installTarball localRepo src pkgId fn
+
+  -- and now that the tarballs are in place, write out the updated index
   writeIndex localRepo newIndex
   return CommandOk
 
 -- |The name of the cabal-install package index
 indexTar :: FilePath
-indexTar = "index-00.tar"
+indexTar = "00-index.tar"
 
 -- |Atomically write an index tarball in the supplied directory
-writeIndex :: FilePath -- ^The local repository path
+writeIndex :: LocalRepository -- ^The local repository path
            -> [T.Entry] -- ^The index entries
            -> IO ()
-writeIndex localRepo ents = do
-  newIndexName <- bracket (openTempFile localRepo indexTar) (hClose . snd) $
-                  \(fn, h) -> L.hPut h (T.write ents) >> return fn
-  renameFile newIndexName (localRepo </> indexTar)
+writeIndex localRepo ents =
+    do newIndexName <- withTmpIndex $ \(fn, h) ->
+                       L.hPut h (T.write ents) >> return fn
+       renameFile newIndexName (pth </> indexTar)
+    where
+      pth = localRepoPath localRepo
+      withTmpIndex = bracket (openTempFile pth indexTar) (hClose . snd)
 
 -- |Merge two lists of tar entries, filtering out the entries from the
 -- original list that will be duplicated by the second list of
@@ -93,12 +99,12 @@ toIndexEntry pkgId c = right toEnt $ T.toTarPath False (indexName pkgId)
 -- |Read an existing index tarball from the local repository, if one
 -- exists. If the file does not exist, behave as if the index has no
 -- entries.
-readExistingIndex :: FilePath -> IO [T.Entry]
+readExistingIndex :: LocalRepository -> IO [T.Entry]
 readExistingIndex localRepo =
     catchJust (guard . isDoesNotExistError) readIndexFile (const $ return [])
     where
-      readIndexFile = withFile (localRepo </> indexTar) ReadMode $
-                      forceEntries . T.read <=< L.hGetContents
+      readIndexFile = withFile (localRepoPath localRepo </> indexTar) ReadMode
+                      (forceEntries . T.read <=< L.hGetContents)
       forceEntries es = do
         let es' = T.foldEntries (:) [] error es
         length es' `seq` return es'
@@ -109,16 +115,21 @@ classifyLocalSource :: FilePath -> LocalSource
 classifyLocalSource fn | isTarball fn = TarPkg
                        | otherwise    = DirPkg
 
-installTarball :: FilePath -> LocalSource -> PackageIdentifier -> FilePath -> IO ()
+-- |Put the tarball for this package in the local repository
+installTarball :: LocalRepository -- ^Location of the local repository
+               -> LocalSource -- ^What kind of package source
+               -> PackageIdentifier
+               -> FilePath -- ^Where the package is in the filesystem
+               -> IO ()
 installTarball localRepo src pkgId fn =
-    do createDirectoryIfMissing True $ localRepo </> repoDir pkgId
+    do createDirectoryIfMissing True $ localRepoPath localRepo </> repoDir pkgId
        case src of
          TarPkg -> copyFile fn dest
          DirPkg -> do
                   tarFn <- makeSDist
                   renameFile tarFn dest
     where
-      dest = localRepo </> tarballName pkgId
+      dest = localRepoPath localRepo </> tarballName pkgId
       makeSDist =
           bracket getCurrentDirectory setCurrentDirectory $ \_ -> do
               setCurrentDirectory fn
