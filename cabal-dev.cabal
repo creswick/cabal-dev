@@ -32,4 +32,10 @@ Executable cabal-dev
     process == 1.0.*,
     tar == 0.3.*,
     zlib == 0.5.*
-  -- Other-modules:
+
+  Other-modules:
+    Distribution.Dev.MkRepo,
+    Distribution.Dev.Log,
+    Distribution.Dev.LocalRepo,
+    Distribution.Dev.Command,
+    Distribution.Dev.Flags

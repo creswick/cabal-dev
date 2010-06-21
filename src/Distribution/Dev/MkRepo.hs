@@ -1,3 +1,11 @@
+{- Copyright (c) 2010 Galois, Inc. -}
+{-|
+
+mk-repo command
+
+Puts local source packages into a repository readable by cabal-install
+
+-}
 module Distribution.Dev.MkRepo
     ( actions
     )
