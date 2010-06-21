@@ -70,7 +70,7 @@ runCmd cmdAct flgs args
                        CommandError msg -> showError [msg]
     where
       showError msgs = do
-        putStr $ unlines $ msgs ++ [cmdDesc cmdAct]
+        putStr $ unlines $ "FAILED:":msgs ++ [replicate 50 '-', cmdDesc cmdAct]
         putStr =<< globalUsage
         exitFailure
 

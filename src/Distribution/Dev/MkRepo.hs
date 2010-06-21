@@ -11,30 +11,46 @@ module Distribution.Dev.MkRepo
     )
 where
 
-import Control.Arrow ( right )
-import Control.Applicative ( (<$>) )
-import Control.Monad ( liftM, ap, guard, (<=<), unless, forM_ )
-import Control.Exception ( bracket, catchJust )
-import System.FilePath ( takeExtension, takeBaseName, splitDirectories, (<.>), (</>), splitExtension )
-import System.Console.GetOpt ( OptDescr(..) )
-import System.IO ( withFile, IOMode(..), openTempFile, hClose )
-import System.Exit ( ExitCode(..) )
-import System.IO.Error ( isDoesNotExistError )
-import System.Directory ( getDirectoryContents, renameFile, copyFile, getCurrentDirectory, setCurrentDirectory, createDirectoryIfMissing )
-import System.Cmd ( rawSystem )
-import Distribution.Package ( PackageName(..), PackageIdentifier(..) )
+import Control.Applicative                   ( (<$>), (<*>) )
+import Control.Arrow                         ( right )
+import Control.Exception                     ( bracket, catchJust )
+import Control.Monad                         ( guard, (<=<), forM_ )
+import Distribution.Package                  ( PackageName(..)
+                                             , PackageIdentifier(..)
+                                             )
+import Distribution.PackageDescription       ( packageDescription, package )
 import Distribution.PackageDescription.Parse ( readPackageDescription )
-import Distribution.PackageDescription ( packageDescription, package )
-import Distribution.Text ( simpleParse, display )
-import qualified Data.ByteString.Lazy as L
-import qualified Codec.Compression.GZip as Z
-import qualified Codec.Archive.Tar as T
-import qualified Codec.Archive.Tar.Entry as T
-import qualified Distribution.Verbosity as V
+import Distribution.Text                     ( simpleParse, display )
+import System.Cmd                            ( rawSystem )
+import System.Console.GetOpt                 ( OptDescr(..) )
+import System.Directory                      ( getDirectoryContents
+                                             , renameFile, copyFile
+                                             , getCurrentDirectory
+                                             , setCurrentDirectory
+                                             , createDirectoryIfMissing
+                                             )
+import System.Exit                           ( ExitCode(..) )
+import System.FilePath                       ( takeExtension, takeBaseName
+                                             , splitDirectories, (<.>), (</>)
+                                             , splitExtension
+                                             )
+import System.IO                             ( withFile, IOMode(..), hClose
+                                             , openTempFile
+                                             )
+import System.IO.Error                       ( isDoesNotExistError )
 
-import Distribution.Dev.Command ( CommandActions(..), CommandResult(..) )
-import Distribution.Dev.Flags ( GlobalFlag )
-import Distribution.Dev.LocalRepo ( resolveLocalRepo, localRepoPath, LocalRepository )
+import qualified Codec.Archive.Tar       as T
+import qualified Codec.Archive.Tar.Entry as T
+import qualified Codec.Compression.GZip  as Z
+import qualified Data.ByteString.Lazy    as L
+import qualified Distribution.Verbosity  as V
+
+import Distribution.Dev.Command   ( CommandActions(..), CommandResult(..) )
+import Distribution.Dev.Flags     ( GlobalFlag )
+import Distribution.Dev.LocalRepo ( resolveLocalRepo, localRepoPath
+                                  , LocalRepository
+                                  )
+
 import qualified Distribution.Dev.Log as Log
 
 actions :: CommandActions
@@ -50,21 +66,32 @@ mkRepo flgs fns = do
   localRepo <- resolveLocalRepo flgs
   Log.debug flgs $ "Making a cabal repo in " ++ localRepoPath localRepo ++
          " out of " ++ show fns
-  (sources, newEntries) <- unzip `fmap` mapM processLocalSource fns
-  existingIndex <- readExistingIndex localRepo
-  let newIndex = mergeIndices existingIndex newEntries
+  results <- mapM processLocalSource fns
+  let errs = [e | Left e <- results]
+      srcs = [s | Right s <- results]
+  if not $ null errs
+    then return $ CommandError $ unlines $
+             "Errors finding cabal files:":map (showString "  ") errs
+    else do
+      let (sources, newEntries) = unzip srcs
+      res <- readExistingIndex localRepo
+      case res of
+        Left err -> return $
+                    CommandError $ "Error reading existing index: " ++ err
+        Right existingIndex ->
+            do let newIndex = mergeIndices existingIndex newEntries
+               -- Now we have the new index ready and have sanity-checked
+               -- all of the package locations to be sure that they
+               -- contain a cabal package (or at least a .cabal file)
+               --
+               -- Now to install the tarballs for the directories:
+               forM_ (zip sources fns) $ \((src, pkgId), fn) ->
+                   installTarball flgs localRepo src pkgId fn
 
-  -- Now we have the new index ready and have sanity-checked all of
-  -- the package locations to be sure that they contain a cabal
-  -- package (or at least a .cabal file)
-  --
-  -- Now to install the tarballs for the directories:
-  forM_ (zip sources fns) $ \((src, pkgId), fn) ->
-      installTarball localRepo src pkgId fn
-
-  -- and now that the tarballs are in place, write out the updated index
-  writeIndex localRepo newIndex
-  return CommandOk
+               -- and now that the tarballs are in place, write out the
+               -- updated index
+               writeIndex localRepo newIndex
+               return CommandOk
 
 -- |Atomically write an index tarball in the supplied directory
 writeIndex :: LocalRepository -- ^The local repository path
@@ -96,15 +123,19 @@ toIndexEntry pkgId c = right toEnt $ T.toTarPath False (indexName pkgId)
 -- |Read an existing index tarball from the local repository, if one
 -- exists. If the file does not exist, behave as if the index has no
 -- entries.
-readExistingIndex :: LocalRepository -> IO [T.Entry]
+readExistingIndex :: LocalRepository -> IO (Either String [T.Entry])
 readExistingIndex localRepo =
-    catchJust (guard . isDoesNotExistError) readIndexFile (const $ return [])
+    catchJust (guard . isDoesNotExistError) readIndexFile $ \() ->
+        return $ Right []
     where
       readIndexFile = withFile (indexTar localRepo) ReadMode
                       (forceEntries . T.read <=< L.hGetContents)
-      forceEntries es = do
-        let es' = T.foldEntries (:) [] error es
-        length es' `seq` return es'
+      forceEntries es =
+        let step _ l@(Left _) = l
+            step x (Right xs) = Right (x:xs)
+            es' = T.foldEntries step (Right []) Left es
+        in either (const 0) length es' `seq` return es'
+
 
 -- |What kind of package source is this?
 data LocalSource = DirPkg | TarPkg
@@ -116,71 +147,99 @@ classifyLocalSource fn | isTarball fn = TarPkg
                        | otherwise    = DirPkg
 
 -- |Put the tarball for this package in the local repository
-installTarball :: LocalRepository -- ^Location of the local repository
+installTarball :: [GlobalFlag]
+               -> LocalRepository -- ^Location of the local repository
                -> LocalSource -- ^What kind of package source
                -> PackageIdentifier
                -> FilePath -- ^Where the package is in the filesystem
-               -> IO ()
-installTarball localRepo src pkgId fn =
+               -> IO (Either String ())
+installTarball flgs localRepo src pkgId fn =
     do createDirectoryIfMissing True $ localRepoPath localRepo </> repoDir pkgId
        case src of
-         TarPkg -> copyFile fn dest
+         TarPkg -> do copyFile fn dest
+                      return $ Right ()
          DirPkg -> do
-                  tarFn <- makeSDist
-                  renameFile tarFn dest
+                  res <- makeSDist
+                  case res of
+                    Left err -> return $ Left err
+                    Right tarFn -> do
+                             renameFile tarFn dest
+                             return $ Right ()
     where
       dest = localRepoPath localRepo </> tarballName pkgId
-      makeSDist =
-          bracket getCurrentDirectory setCurrentDirectory $ \_ -> do
-              setCurrentDirectory fn
-              cabalRes <- rawSystem "cabal" ["sdist"]
-              case cabalRes of
-                ExitSuccess -> return ()
-                ExitFailure code ->
-                    error $ "cabal sdist failed with " ++ show code
-              here <- getCurrentDirectory
-              return $ here </> "dist" </> display pkgId <.> "tar" <.> "gz"
+      makeSDist = do
+        Log.debug flgs $ "Running cabal sdist in " ++ fn
+        bracket getCurrentDirectory setCurrentDirectory $ \_ -> do
+                    setCurrentDirectory fn
+                    cabalRes <- rawSystem "cabal" ["sdist"]
+                    case cabalRes of
+                      ExitSuccess ->
+                          do here <- getCurrentDirectory
+                             return $ Right $ here </> "dist" </>
+                                    display pkgId <.> "tar" <.> "gz"
+                      ExitFailure code ->
+                          return $ Left $
+                                  "cabal sdist failed with " ++ show code
 
 -- |Extract the index information from the supplied path, either as a
 -- tarball or as a local package directory
 processLocalSource :: FilePath
-                   -> IO ((LocalSource, PackageIdentifier), T.Entry)
+                   -> IO (Either String ((LocalSource, PackageIdentifier), T.Entry))
 processLocalSource fn = do
   let src = classifyLocalSource fn
-  (pkgId, c) <- case src of
+  res <- case src of
            TarPkg -> processTarball fn
            DirPkg -> processDirectory fn
-  ent <- either fail return $ toIndexEntry pkgId c
-  return ((src, pkgId), ent)
+  case res of
+    Left err -> return $ Left $ "Processing package from " ++ fn ++ ": " ++
+                err
+    Right (pkgId, c) -> do
+             ent <- either fail return $ toIndexEntry pkgId c
+             return $ Right ((src, pkgId), ent)
 
 -- |Extract the index information from a tarball
-processTarball :: FilePath -> IO (PackageIdentifier, L.ByteString)
+processTarball :: FilePath
+               -> IO (Either String (PackageIdentifier, L.ByteString))
 processTarball fn =
     withFile fn ReadMode $ \h ->
         do ents <- T.read . Z.decompress <$> L.hGetContents h
            case extractCabalFile ents of
-             Nothing -> error "No cabal file found"
+             Nothing -> return $ Left "No cabal file found"
 
              -- Force reading the cabal file before we exit withFile
-             Just res -> forceBS (snd res) >> return res
+             Just res -> forceBS (snd res) >> return (Right res)
 
 -- |Extract the index information from a directory containing a cabal
 -- file
-processDirectory :: FilePath -> IO (PackageIdentifier, L.ByteString)
-processDirectory d = do
-  fns <- getDirectoryContents d
-  case filter isCabalFile fns of
-    [] -> error "No cabal file found"
-    [c] -> do
-      let fn = d </> c
-      pkgId <- package . packageDescription <$>
-               readPackageDescription V.normal fn
-      unless (PackageName (takeBaseName c) == pkgName pkgId) $
-             error $ "Package name does not match\ 
-                     \ cabal file name: " ++ fn
-      cabalFile <- withFile fn ReadMode $ forcedBS <=< L.hGetContents
-      return (pkgId, cabalFile)
-    _ -> error "More than one cabal file present"
+processDirectory :: FilePath
+                 -> IO (Either String (PackageIdentifier, L.ByteString))
+processDirectory d = catchJust selectExpected go $ \e ->
+                     return $ Left $ show e
+    where
+      selectExpected e = guard (expected e) >> return e
+
+      expected e = any ($ e) [ isDoesNotExistError
+                             ]
+
+      go = do
+        fns <- getDirectoryContents d
+        case filter isCabalFile fns of
+          [c] -> processCabalFile c
+          []  -> return $ Left "No cabal file found"
+          _   -> return $ Left "More than one cabal file present"
+
+      processCabalFile c = do
+        let fn = d </> c
+        pkgId <- package . packageDescription <$>
+                 readPackageDescription V.normal fn
+        if PackageName (takeBaseName c) == pkgName pkgId
+          then do
+            cabalFile <- withFile fn ReadMode $
+                         forcedBS <=< L.hGetContents
+            return $ Right (pkgId, cabalFile)
+          else
+            return $ Left $ "Package name does not match cabal \ 
+                            \file name: " ++ fn
 
 -- |Force a lazy ByteString to be read
 forceBS :: L.ByteString -> IO ()
@@ -194,7 +253,7 @@ forcedBS bs = forceBS bs >> return bs
 extractCabalFile :: T.Entries -> Maybe (PackageIdentifier, L.ByteString)
 extractCabalFile = T.foldEntries step Nothing (const Nothing)
     where
-      step ent Nothing = (,) `liftM` entPackageId ent `ap` entBytes ent
+      step ent Nothing = (,) <$> entPackageId ent <*> entBytes ent
       step _   ans     = ans
 
       entPackageId ent =
