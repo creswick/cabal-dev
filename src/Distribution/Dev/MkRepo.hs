@@ -47,8 +47,8 @@ import qualified Distribution.Verbosity  as V
 
 import Distribution.Dev.Command   ( CommandActions(..), CommandResult(..) )
 import Distribution.Dev.Flags     ( GlobalFlag )
-import Distribution.Dev.LocalRepo ( resolveLocalRepo, localRepoPath
-                                  , LocalRepository
+import Distribution.Dev.LocalRepo ( resolveSandbox, localRepoPath
+                                  , Sandbox
                                   )
 
 import qualified Distribution.Dev.Log as Log
@@ -63,7 +63,7 @@ actions = CommandActions
 mkRepo :: [GlobalFlag] -> [String] -> IO CommandResult
 mkRepo _    [] = return $ CommandError "No local package locations supplied"
 mkRepo flgs fns = do
-  localRepo <- resolveLocalRepo flgs
+  localRepo <- resolveSandbox flgs
   Log.debug flgs $ "Making a cabal repo in " ++ localRepoPath localRepo ++
          " out of " ++ show fns
   results <- mapM processLocalSource fns
@@ -94,7 +94,7 @@ mkRepo flgs fns = do
                return CommandOk
 
 -- |Atomically write an index tarball in the supplied directory
-writeIndex :: LocalRepository -- ^The local repository path
+writeIndex :: Sandbox -- ^The local repository path
            -> [T.Entry] -- ^The index entries
            -> IO ()
 writeIndex localRepo ents =
@@ -123,7 +123,7 @@ toIndexEntry pkgId c = right toEnt $ T.toTarPath False (indexName pkgId)
 -- |Read an existing index tarball from the local repository, if one
 -- exists. If the file does not exist, behave as if the index has no
 -- entries.
-readExistingIndex :: LocalRepository -> IO (Either String [T.Entry])
+readExistingIndex :: Sandbox -> IO (Either String [T.Entry])
 readExistingIndex localRepo =
     catchJust (guard . isDoesNotExistError) readIndexFile $ \() ->
         return $ Right []
@@ -148,7 +148,7 @@ classifyLocalSource fn | isTarball fn = TarPkg
 
 -- |Put the tarball for this package in the local repository
 installTarball :: [GlobalFlag]
-               -> LocalRepository -- ^Location of the local repository
+               -> Sandbox -- ^Location of the local repository
                -> LocalSource -- ^What kind of package source
                -> PackageIdentifier
                -> FilePath -- ^Where the package is in the filesystem
@@ -296,5 +296,5 @@ repoDir pkgId = display (pkgName pkgId) </>
 indexTarBase :: FilePath
 indexTarBase = "00-index.tar"
 
-indexTar :: LocalRepository -> FilePath
+indexTar :: Sandbox -> FilePath
 indexTar lr = localRepoPath lr </> indexTarBase

@@ -11,14 +11,17 @@ import System.Console.GetOpt ( OptDescr(..), ArgOrder(..), ArgDescr(..), getOpt'
 
 data GlobalFlag = Help
                 | Verbose
-                | LocalRepo FilePath
+                | Sandbox FilePath
+                | CabalConf FilePath
                   deriving (Eq, Show)
 
 globalOpts :: [OptDescr GlobalFlag]
 globalOpts = [ Option "h?" ["help"] (NoArg Help) "Show help text"
-             , Option "r" ["local-repo"] (ReqArg LocalRepo "DIR")
-               "The location of the development cabal \ 
-               \sandbox (default: ./cabal-dev)"
+             , Option "s" ["sandbox"] (ReqArg Sandbox "DIR")
+               "The location of the development cabal sandbox (default: \ 
+               \./cabal-dev)"
+             , Option "c" ["config"] (ReqArg CabalConf "PATH")
+               "The location of the cabal-install config file"
              , Option "v" ["verbose"] (NoArg Verbose) "Show debugging output"
              ]
 

@@ -12,10 +12,14 @@ Copyright:           2010 Galois, Inc.
 Category:            Development
 Build-type:          Simple
 Cabal-version:       >=1.6
+
+Data-Files:
+  admin/cabal-config.in
+
 Executable cabal-dev
   HS-Source-Dirs: src
   Main-is: Main.hs
-  GHC-Options: -Wall -fforce-recomp
+  GHC-Options: -Wall
 
   if impl(ghc >= 6.10)
     Build-depends:

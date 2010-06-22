@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -e
+runhaskell -isrc ./bin/InitPkgDb.hs
+CABAL_CONFIG=cabal-dev/cabal.config cabal install

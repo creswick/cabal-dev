@@ -1,5 +1,4 @@
 {- Copyright (c) 2010 Galois, Inc -}
-{-# LANGUAGE ExistentialQuantification #-}
 module Main
     ( main )
 where
@@ -13,9 +12,26 @@ import System.Console.GetOpt ( usageInfo, getOpt, ArgOrder(Permute) )
 import Distribution.Dev.Command ( CommandActions(..), CommandResult(..) )
 import Distribution.Dev.Flags ( parseGlobalFlags, helpRequested, globalOpts, GlobalFlag )
 import qualified Distribution.Dev.MkRepo as MkRepo
+import qualified Distribution.Dev.InvokeCabal as InvokeCabal
 
 allCommands :: [(String, CommandActions)]
-allCommands = [("mk-repo", MkRepo.actions)]
+allCommands = [ ("mk-repo", MkRepo.actions)
+              , cabal "install"
+              , cabal "update"
+              , cabal "list"
+              , cabal "info"
+              , cabal "fetch"
+              , cabal "unpack"
+              , cabal "configure"
+              , cabal "build"
+              , cabal "register"
+              , cabal "clean"
+              , cabal "haddock"
+              , cabal "init"
+              , cabal "hscolour"
+              ]
+    where
+      cabal s = (s, InvokeCabal.actions s)
 
 main :: IO ()
 main = do
