@@ -39,4 +39,4 @@ mkdir -p $SANDBOX
 init-pkg-db
 rewriteCabalConfig admin/cabal-config.in "${SANDBOX}/cabal.config"
 cabal --config-file="${SANDBOX}/cabal.config" install
-"${SANDBOX}/bin/cabal-dev" mk-repo .
+"${SANDBOX}/bin/cabal-dev" add-source .

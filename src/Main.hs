@@ -7,7 +7,7 @@ import Data.Maybe ( listToMaybe )
 import Control.Monad ( unless )
 import System.Exit ( exitFailure, exitSuccess )
 import System.Environment ( getArgs, getProgName )
-import System.Console.GetOpt ( usageInfo, getOpt, ArgOrder(Permute) )
+import System.Console.GetOpt ( usageInfo, getOpt, ArgOrder(Permute), getOpt' )
 
 import Distribution.Dev.Command ( CommandActions(..), CommandResult(..) )
 import Distribution.Dev.Flags ( parseGlobalFlags, helpRequested, globalOpts, GlobalFlag )
@@ -15,7 +15,7 @@ import qualified Distribution.Dev.MkRepo as MkRepo
 import qualified Distribution.Dev.InvokeCabal as InvokeCabal
 
 allCommands :: [(String, CommandActions)]
-allCommands = [ ("mk-repo", MkRepo.actions)
+allCommands = [ ("add-source", MkRepo.actions)
               , cabal "install"
               , cabal "update"
               , cabal "list"
@@ -96,9 +96,12 @@ runCmd cmdAct flgs args
         exitSuccess
 
       run = case cmdAct of
-              (CommandActions _ r o) ->
+              (CommandActions _ r o passFlags) ->
                   let (cmdFlags, cmdArgs, cmdErrs) =
-                          getOpt Permute o args
+                          if passFlags
+                          then let (a, b, c, d) = getOpt' Permute o args
+                               in (a, b ++ c, d)
+                          else getOpt Permute o args
                   in if null cmdErrs
                      then r flgs cmdFlags cmdArgs
                      else showError cmdErrs

@@ -46,26 +46,28 @@ import qualified Data.ByteString.Lazy    as L
 import qualified Distribution.Verbosity  as V
 
 import Distribution.Dev.Command   ( CommandActions(..), CommandResult(..) )
-import Distribution.Dev.Flags     ( GlobalFlag )
+import Distribution.Dev.Flags     ( GlobalFlag, getVerbosity )
 import Distribution.Dev.LocalRepo ( resolveSandbox, localRepoPath
                                   , Sandbox
                                   )
 
-import qualified Distribution.Dev.Log as Log
+import Distribution.Simple.Utils ( debug )
 
 actions :: CommandActions
 actions = CommandActions
             { cmdDesc = "Add packages to a local cabal install repository"
             , cmdRun = \flgs _ -> mkRepo flgs
             , cmdOpts = [] :: [OptDescr ()]
+            , cmdPassFlags = False
             }
 
 mkRepo :: [GlobalFlag] -> [String] -> IO CommandResult
 mkRepo _    [] = return $ CommandError "No local package locations supplied"
 mkRepo flgs fns = do
   localRepo <- resolveSandbox flgs
-  Log.debug flgs $ "Making a cabal repo in " ++ localRepoPath localRepo ++
-         " out of " ++ show fns
+  debug (getVerbosity flgs)
+            $ "Making a cabal repo in " ++ localRepoPath localRepo ++
+            " out of " ++ show fns
   results <- mapM processLocalSource fns
   let errs = [e | Left e <- results]
       srcs = [s | Right s <- results]
@@ -168,7 +170,7 @@ installTarball flgs localRepo src pkgId fn =
     where
       dest = localRepoPath localRepo </> tarballName pkgId
       makeSDist = do
-        Log.debug flgs $ "Running cabal sdist in " ++ fn
+        debug (getVerbosity flgs) $ "Running cabal sdist in " ++ fn
         bracket getCurrentDirectory setCurrentDirectory $ \_ -> do
                     setCurrentDirectory fn
                     cabalRes <- rawSystem "cabal" ["sdist"]

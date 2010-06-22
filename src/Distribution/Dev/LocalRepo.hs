@@ -10,8 +10,8 @@ module Distribution.Dev.LocalRepo
 where
 
 import Data.Maybe ( listToMaybe )
-import qualified Distribution.Dev.Flags as F ( GlobalFlag(Sandbox) )
-import Distribution.Dev.Log ( debug )
+import qualified Distribution.Dev.Flags as F ( GlobalFlag(Sandbox), getVerbosity )
+import Distribution.Simple.Utils ( debug )
 import System.Directory ( canonicalizePath, createDirectoryIfMissing )
 import System.FilePath ( (</>) )
 
@@ -40,11 +40,13 @@ resolveSandbox flgs = do
   relSandbox <-
       case getSandbox flgs of
         Nothing -> do
-          debug flgs $ "No local repository specified. Using " ++ defaultSandbox
+          debug (F.getVerbosity flgs) $
+                    "No local repository specified. Using " ++ defaultSandbox
           return defaultSandbox
         Just s -> return $ s
 
   localRepo <- canonicalizePath relSandbox
-  debug flgs $ "Using " ++ localRepo ++ " as the local repository path"
+  debug (F.getVerbosity flgs) $
+            "Using " ++ localRepo ++ " as the local repository path"
   createDirectoryIfMissing True localRepo
   return $ Sandbox localRepo
