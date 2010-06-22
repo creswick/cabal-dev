@@ -43,7 +43,7 @@ setup flgs = do
 invokeCabalCfg :: [String] -> (Verbosity, FilePath) -> IO CommandResult
 invokeCabalCfg args (v, cfg) = do
   let args' = ("--config-file=" ++ cfg):
-              ("--verbosity=" ++ showForCabal v):
+              ("--verbose=" ++ showForCabal v):
               args
   res <- rawSystem "cabal" args'
   return $ case res of

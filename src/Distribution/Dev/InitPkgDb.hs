@@ -4,23 +4,13 @@ module Distribution.Dev.InitPkgDb
     )
 where
 
-#ifndef MIN_VERSION_Cabal
-#define MIN_VERSION_Cabal(x,y,z) 1
-#endif
-
 import Control.Monad ( unless )
 import qualified Distribution.Verbosity as V
 import Distribution.Version ( Version(..) )
-import Distribution.Simple.Program ( ghcPkgProgram, requireProgram, programVersion, ConfiguredProgram )
-#if MIN_VERSION_Cabal(1,8,0)
+import Distribution.Simple.Program ( ghcPkgProgram, requireProgram
+                                   , programVersion, ConfiguredProgram
+                                   , runProgram )
 import Distribution.Simple.Program.Db ( emptyProgramDb )
-import Distribution.Simple.Program ( runProgram )
-#elif MIN_VERSION_Cabal(1,6,0)
-import Distribution.Simple.Program ( emptyProgramConfiguration, rawSystemProgram )
-import Distribution.Version ( VersionRange(AnyVersion) )
-#else
-#error Requires Cabal 1.6 or 1.8
-#endif
 import System.Directory ( doesFileExist, doesDirectoryExist )
 
 import Distribution.Dev.LocalRepo ( Sandbox, pkgConf )
@@ -38,15 +28,9 @@ import Distribution.Dev.LocalRepo ( Sandbox, pkgConf )
 -- cabal config file.
 initPkgDb :: Sandbox -> IO ()
 initPkgDb s = do
-#if MIN_VERSION_Cabal(1,8,0)
   let require = requireProgram
       run     = runProgram
       empty   = emptyProgramDb
-#elif MIN_VERSION_Cabal(1,6,0)
-  let require v = requireProgram v AnyVersion
-      run     = rawSystemProgram
-      empty   = emptyProgramConfiguration
-#endif
 
   (ghcPkg, _) <- require V.normal ghcPkgProgram empty
   case ghcPackageDbType ghcPkg of
