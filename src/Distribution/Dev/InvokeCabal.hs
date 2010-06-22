@@ -8,8 +8,7 @@ import Distribution.Dev.InitPkgDb ( initPkgDb )
 import Distribution.Dev.Command ( CommandActions(..), CommandResult(..) )
 import System.Console.GetOpt ( OptDescr )
 import System.Exit ( ExitCode(..) )
-import System.Process ( CreateProcess(env), proc, createProcess, waitForProcess )
-import System.Environment ( getEnvironment )
+import System.Process ( proc, createProcess, waitForProcess )
 
 actions :: String -> CommandActions
 actions act = CommandActions
@@ -23,9 +22,7 @@ invokeCabal :: [GlobalFlag] -> [String] -> IO CommandResult
 invokeCabal flgs args = do
   s <- resolveSandbox flgs
   initPkgDb s
-  parentEnv <- getEnvironment
-  let env' = ("CABAL_CONFIG", cabalConf s):parentEnv
-      cmd = (proc "cabal" args) { env = Just env' }
+  let cmd = proc "cabal" $ ("--config-file=" ++ cabalConf s):args
   (_,_,_, h) <- createProcess cmd
   res <- waitForProcess h
   case res of

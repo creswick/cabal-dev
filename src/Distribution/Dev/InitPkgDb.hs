@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 module Distribution.Dev.InitPkgDb
     ( initPkgDb
     )
@@ -7,7 +8,12 @@ import Control.Monad ( unless )
 import qualified Distribution.Verbosity as V
 import Distribution.Version ( Version(..) )
 import Distribution.Simple.Program ( ghcPkgProgram, requireProgram, programVersion, ConfiguredProgram, runProgram )
+#if MIN_VERSION_Cabal(1,8,0)
 import Distribution.Simple.Program.Db ( emptyProgramDb )
+#elif MIN_VERSION_Cabal(1,6,0)
+import Distribution.Simple.Program ( emptyProgramConfiguration )
+import Distribution.Version ( VersionRange(AnyVersion) )
+#endif
 import System.Directory ( doesFileExist, doesDirectoryExist )
 
 import Distribution.Dev.LocalRepo ( Sandbox, pkgConf )
@@ -33,7 +39,11 @@ ghcPackageDbType p = case programVersion p of
 -- cabal config file.
 initPkgDb :: Sandbox -> IO ()
 initPkgDb s = do
+#if MIN_VERSION_Cabal(1,8,0)
   (ghcPkg, _) <- requireProgram V.normal ghcPkgProgram emptyProgramDb
+#elif MIN_VERSION_Cabal(1,6,0)
+  (ghcPkg, _) <- requireProgram anyVersion V.normal ghcPkgProgram emptyProgramConfiguration
+#endif
   case ghcPackageDbType ghcPkg of
     FileDb -> do
       e <- doesFileExist (pkgConf s)

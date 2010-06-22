@@ -1,4 +1,28 @@
 #!/usr/bin/env bash
 set -e
-runhaskell -isrc ./bin/InitPkgDb.hs
-CABAL_CONFIG=cabal-dev/cabal.config cabal install
+set -x
+
+SANDBOX=cabal-dev
+PKGDB=$SANDBOX/packages.conf
+
+# Bootstrap package db. cabal-dev can do this, but we want to build
+# cabal-dev itself in a sandbox
+function init_pkg_db {
+    VER_STR="$(ghc-pkg --version)"
+    case "$VER_STR" in
+        "GHC package manager version 6.10."*)
+            [ -f "${PKGDB}" ] || echo -n "[]" > "${PKGDB}"
+            ;;
+        "GHC package manager version 6.12."*)
+            [ -d "${PKGDB}" ] || ghc-pkg init "${PKGDB}"
+            ;;
+        *)
+            echo "This script can handle ghc-pkg 6.10 and " \
+                "6.12, but cannot handle other versions" 1>&2
+            exit 1
+            ;;
+    esac
+}
+
+cabal --config-file=$SANDBOX/cabal.config install
+$SANDBOX/bin/cabal-dev mk-repo .
