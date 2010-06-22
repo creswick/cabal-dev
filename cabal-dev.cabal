@@ -15,10 +15,6 @@ Cabal-version:       >=1.6
 Data-Files:
   admin/cabal-config.in
 
-Flag older-cabal
-  Description: Use an older relase of Cabal
-  Default: False
-
 Executable cabal-dev
   HS-Source-Dirs: src
   Main-is: Main.hs
@@ -31,17 +27,11 @@ Executable cabal-dev
     Build-depends:
       base == 3.*
 
-  if flag(older-cabal)
-    Build-depends:
-      Cabal == 1.6.*
-  else
-    Build-depends:
-      Cabal >= 1.6 && < 1.9
-
   Build-depends:
     bytestring == 0.9.*,
     directory == 1.0.*,
     filepath == 1.1.*,
+    Cabal >= 1.8.0.6 && < 1.9,
     pretty == 1.0.*,
     process == 1.0.*,
     tar == 0.3.*,
