@@ -43,7 +43,7 @@ initPkgDb s = do
       run     = runProgram
       empty   = emptyProgramDb
 #elif MIN_VERSION_Cabal(1,6,0)
-  let require = requireProgram AnyVersion
+  let require v = requireProgram v AnyVersion
       run     = rawSystemProgram
       empty   = emptyProgramConfiguration
 #endif
