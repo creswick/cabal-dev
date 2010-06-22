@@ -7,7 +7,7 @@ PKGDB=$SANDBOX/packages.conf
 
 # Bootstrap package db. cabal-dev can do this, but we want to build
 # cabal-dev itself in a sandbox
-function init_pkg_db {
+function init-pkg-db {
     VER_STR="$(ghc-pkg --version)"
     case "$VER_STR" in
         "GHC package manager version 6.10."*)
@@ -24,5 +24,19 @@ function init_pkg_db {
     esac
 }
 
-cabal --config-file=$SANDBOX/cabal.config install
-$SANDBOX/bin/cabal-dev mk-repo .
+rewriteCabalConfig () {
+    CFGIN="$1"
+    CFGOUT="$2"
+    HERE=$(pwd)
+    OUT="${CFGOUT}.tmp"
+    TILDE=$(echo "$HOME" | sed 's/\//\\\//g')
+    DOT=$(pwd | sed 's/\//\\\//g')
+    sed -e 's/ ~\//'"$TILDE"'\//g' -e 's/ \.\// '"$DOT"'\//g' "$CFGIN" > "$OUT"
+    mv "${OUT}" "${CFGOUT}"
+}
+
+mkdir -p $SANDBOX
+init-pkg-db
+rewriteCabalConfig admin/cabal-config.in "${SANDBOX}/cabal.config"
+cabal --config-file="${SANDBOX}/cabal.config" install
+"${SANDBOX}/bin/cabal-dev" mk-repo .

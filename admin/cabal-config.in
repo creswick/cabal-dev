@@ -9,7 +9,7 @@
 
 
 remote-repo: hackage.haskell.org:http://hackage.haskell.org/packages/archive
-remote-repo-cache: ./cabal-dev/.cabal/packages
+remote-repo-cache: ~/.cabal/packages
 local-repo: ./cabal-dev/packages
 -- local-repo:
 -- verbose: 1
@@ -28,7 +28,7 @@ local-repo: ./cabal-dev/packages
 -- split-objs: False
 -- executable-stripping: True
 user-install: False
-package-db: ./cabal-dev/packages.conf.d
+package-db: ./cabal-dev/packages.conf
 -- flags:
 -- extra-include-dirs:
 -- extra-lib-dirs:
@@ -46,7 +46,7 @@ remote-build-reporting: anonymous
 -- password:
 
 install-dirs user
-  -- prefix: $HOME/.cabal
+  -- prefix: ~/.cabal
   -- bindir: $prefix/bin
   -- libdir: $prefix/lib
   -- libsubdir: $pkgid/$compiler

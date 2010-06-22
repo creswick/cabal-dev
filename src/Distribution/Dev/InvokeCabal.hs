@@ -2,13 +2,15 @@ module Distribution.Dev.InvokeCabal
     ( actions )
 where
 
+import Control.Arrow ( left, right )
 import Distribution.Dev.LocalRepo ( resolveSandbox, cabalConf )
-import Distribution.Dev.Flags ( GlobalFlag )
+import Distribution.Dev.Flags ( GlobalFlag, getCabalConfig )
 import Distribution.Dev.InitPkgDb ( initPkgDb )
+import Distribution.Dev.RewriteCabalConfig ( rewriteCabalConfig )
 import Distribution.Dev.Command ( CommandActions(..), CommandResult(..) )
 import System.Console.GetOpt ( OptDescr )
 import System.Exit ( ExitCode(..) )
-import System.Process ( proc, createProcess, waitForProcess )
+import System.Process ( rawSystem )
 
 actions :: String -> CommandActions
 actions act = CommandActions
@@ -20,12 +22,23 @@ actions act = CommandActions
 
 invokeCabal :: [GlobalFlag] -> [String] -> IO CommandResult
 invokeCabal flgs args = do
+  either (return . CommandError) (invokeCabalCfg args) =<< setup flgs
+
+setup :: [GlobalFlag] -> IO (Either String FilePath)
+setup flgs = do
   s <- resolveSandbox flgs
   initPkgDb s
-  let cmd = proc "cabal" $ ("--config-file=" ++ cabalConf s):args
-  (_,_,_, h) <- createProcess cmd
-  res <- waitForProcess h
-  case res of
-    ExitSuccess -> return CommandOk
-    ExitFailure code -> return $ CommandError $
-                        "cabal-install failed with " ++ show code
+  cfgIn <- getCabalConfig flgs
+  let cfgOut = cabalConf s
+  cfgRes <- rewriteCabalConfig cfgIn cfgOut
+  let qualifyError err =
+          "Error processing cabal config file " ++ cfgIn ++ ": " ++ err
+  return $ left qualifyError $ right (const cfgOut) $ cfgRes
+
+invokeCabalCfg :: [String] -> FilePath -> IO CommandResult
+invokeCabalCfg args cfg = do
+  res <- rawSystem "cabal" $ ("--config-file=" ++ cfg):args
+  return $ case res of
+             ExitSuccess      -> CommandOk
+             ExitFailure code -> CommandError $
+                                 "cabal-install failed with " ++ show code

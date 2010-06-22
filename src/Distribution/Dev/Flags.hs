@@ -4,10 +4,13 @@ module Distribution.Dev.Flags
     , globalOpts
     , parseGlobalFlags
     , helpRequested
+    , getCabalConfig
     )
 where
 
+import Data.Maybe ( listToMaybe )
 import System.Console.GetOpt ( OptDescr(..), ArgOrder(..), ArgDescr(..), getOpt' )
+import Paths_cabal_dev ( getDataFileName )
 
 data GlobalFlag = Help
                 | Verbose
@@ -32,3 +35,10 @@ parseGlobalFlags args =
 
 helpRequested :: [GlobalFlag] -> Bool
 helpRequested = (Help `elem`)
+
+cabalConfigFlag :: [GlobalFlag] -> Maybe FilePath
+cabalConfigFlag flgs = listToMaybe [p | CabalConf p <- flgs]
+
+getCabalConfig :: [GlobalFlag] -> IO FilePath
+getCabalConfig = maybe (getDataFileName "admin/cabal-config.in") return .
+                 cabalConfigFlag

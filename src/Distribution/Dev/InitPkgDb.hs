@@ -4,6 +4,10 @@ module Distribution.Dev.InitPkgDb
     )
 where
 
+#ifndef MIN_VERSION_Cabal
+#define MIN_VERSION_Cabal(x,y,z) 1
+#endif
+
 import Control.Monad ( unless )
 import qualified Distribution.Verbosity as V
 import Distribution.Version ( Version(..) )
@@ -13,6 +17,8 @@ import Distribution.Simple.Program.Db ( emptyProgramDb )
 #elif MIN_VERSION_Cabal(1,6,0)
 import Distribution.Simple.Program ( emptyProgramConfiguration )
 import Distribution.Version ( VersionRange(AnyVersion) )
+#else
+#error Requires Cabal 1.6 or 1.8
 #endif
 import System.Directory ( doesFileExist, doesDirectoryExist )
 

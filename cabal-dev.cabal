@@ -33,6 +33,7 @@ Executable cabal-dev
     Cabal >= 1.6 && < 1.9,
     directory == 1.0.*,
     filepath == 1.1.*,
+    pretty == 1.0.*,
     process == 1.0.*,
     tar == 0.3.*,
     zlib == 0.5.*
