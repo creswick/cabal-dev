@@ -16,27 +16,37 @@ import Control.Monad             ( liftM )
 import Distribution.Simple.Utils ( withUTF8FileContents, writeUTF8File )
 import Distribution.ParseUtils   ( readFields, ParseResult(..), Field(..) )
 import System.Directory          ( canonicalizePath, getHomeDirectory )
+import Distribution.Dev.LocalRepo ( Sandbox, KnownVersion, pkgConf )
 import Text.PrettyPrint.HughesPJ
 
 -- |Rewrite a cabal-install config file so that all paths are made
 -- absolute and canonical.
 rewriteCabalConfig :: FilePath -- ^The input config file
-                -> FilePath -- ^The output config file
-                -> IO (Either String ())
-rewriteCabalConfig cfgIn cfgOut = do
+                   -> FilePath -- ^The output config file
+                   -> Sandbox KnownVersion
+                   -> IO (Either String ())
+rewriteCabalConfig cfgIn cfgOut s = do
   home <- getHomeDirectory
-  rewriteConfig (expandCabalConfig home) cfgIn cfgOut
+  rewriteConfig (expandCabalConfig home) (setPackageDb s) cfgIn cfgOut
 
 -- |Given an expansion configuration, read the input config file and
 -- write the expansion into the output config file
-rewriteConfig :: Expand IO -> FilePath -> FilePath -> IO (Either String ())
-rewriteConfig expand srcConfig destConfig =
+rewriteConfig :: Expand IO -> ([Field] -> [Field])
+              -> FilePath -> FilePath -> IO (Either String ())
+rewriteConfig expand proc srcConfig destConfig =
     withUTF8FileContents srcConfig $ \s ->
         case readFields s of
           ParseFailed err -> return $ Left $ show err
-          ParseOk _ fs    -> fmap Right $
-                             writeUTF8File destConfig . show . ppTopLevel =<<
-                             rewriteTopLevel expand fs
+          ParseOk _ fs    ->
+              fmap Right $
+              writeUTF8File destConfig . show . ppTopLevel . proc =<<
+              rewriteTopLevel expand fs
+
+setPackageDb :: Sandbox KnownVersion -> [Field] -> [Field]
+setPackageDb s = (F 0 "package-db" (pkgConf s):) . filter (not . isPackageDb)
+    where
+      isPackageDb (F _ "package-db" _) = True
+      isPackageDb _                  = False
 
 rewriteTopLevel :: Monad m => Expand m -> [Field] -> m [Field]
 rewriteTopLevel = mapM . rewriteField

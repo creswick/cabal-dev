@@ -2,8 +2,8 @@
 set -e
 set -x
 
+PATH="${HOME}/haskell/runtime/haskell-platform-2009.2.0.2/bin:${PATH}"
 SANDBOX=cabal-dev
-PKGDB=$SANDBOX/packages.conf
 
 # Bootstrap package db. cabal-dev can do this, but we want to build
 # cabal-dev itself in a sandbox
@@ -11,9 +11,11 @@ function init-pkg-db {
     VER_STR="$(ghc-pkg --version)"
     case "$VER_STR" in
         "GHC package manager version 6.10."*)
+            PKGDB=${SANDBOX}/packages.conf
             [ -f "${PKGDB}" ] || echo -n "[]" > "${PKGDB}"
             ;;
         "GHC package manager version 6.12."*)
+            PKGDB=${SANDBOX}/packages.conf.d
             [ -d "${PKGDB}" ] || ghc-pkg init "${PKGDB}"
             ;;
         *)
@@ -31,7 +33,10 @@ rewriteCabalConfig () {
     OUT="${CFGOUT}.tmp"
     TILDE=$(echo "$HOME" | sed 's/\//\\\//g')
     DOT=$(pwd | sed 's/\//\\\//g')
-    sed -e 's/ ~\//'"$TILDE"'\//g' -e 's/ \.\// '"$DOT"'\//g' "$CFGIN" > "$OUT"
+    PKG=$(basename "${PKGDB}" | sed 's/\//\\\//g')
+    sed -e 's/ ~\//'"$TILDE"'\//g' \
+        -e 's/ \.\// '"$DOT"'\//g' "$CFGIN" \
+        -e 's/\/packages.conf$/\/'"${PKG}"'/g' > "${OUT}"
     mv "${OUT}" "${CFGOUT}"
 }
 

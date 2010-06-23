@@ -31,7 +31,7 @@ Executable cabal-dev
     bytestring == 0.9.*,
     directory == 1.0.*,
     filepath == 1.1.*,
-    Cabal >= 1.8.0.6 && < 1.9,
+    Cabal >= 1.6 && < 1.9,
     pretty == 1.0.*,
     process == 1.0.*,
     tar == 0.3.*,

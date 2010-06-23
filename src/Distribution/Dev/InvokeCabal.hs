@@ -28,11 +28,10 @@ invokeCabal flgs args = do
 
 setup :: [GlobalFlag] -> IO (Either String (Verbosity, FilePath))
 setup flgs = do
-  s <- resolveSandbox flgs
-  initPkgDb s
+  s <- initPkgDb =<< resolveSandbox flgs
   cfgIn <- getCabalConfig flgs
   let cfgOut = cabalConf s
-  cfgRes <- rewriteCabalConfig cfgIn cfgOut
+  cfgRes <- rewriteCabalConfig cfgIn cfgOut s
   let qualifyError err =
           "Error processing cabal config file " ++ cfgIn ++ ": " ++ err
   return $
