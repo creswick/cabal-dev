@@ -38,7 +38,10 @@ Executable cabal-dev
     zlib == 0.5.*
 
   Other-modules:
-    Distribution.Dev.MkRepo,
-    Distribution.Dev.LocalRepo,
+    Distribution.Dev.AddSource,
+    Distribution.Dev.Sandbox,
     Distribution.Dev.Command,
-    Distribution.Dev.Flags
+    Distribution.Dev.Flags,
+    Distribution.Dev.InvokeCabal,
+    Distribution.Dev.RewriteCabalConfig,
+    Distribution.Dev.InitPkgDb

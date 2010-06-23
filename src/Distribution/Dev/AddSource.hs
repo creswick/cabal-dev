@@ -1,12 +1,12 @@
 {- Copyright (c) 2010 Galois, Inc. -}
 {-|
 
-mk-repo command
+add-source command
 
 Puts local source packages into a repository readable by cabal-install
 
 -}
-module Distribution.Dev.MkRepo
+module Distribution.Dev.AddSource
     ( actions
     )
 where
@@ -45,11 +45,11 @@ import qualified Codec.Compression.GZip  as Z
 import qualified Data.ByteString.Lazy    as L
 import qualified Distribution.Verbosity  as V
 
-import Distribution.Dev.Command   ( CommandActions(..), CommandResult(..) )
-import Distribution.Dev.Flags     ( GlobalFlag, getVerbosity )
-import Distribution.Dev.LocalRepo ( resolveSandbox, localRepoPath
-                                  , Sandbox
-                                  )
+import Distribution.Dev.Command ( CommandActions(..), CommandResult(..) )
+import Distribution.Dev.Flags   ( GlobalFlag, getVerbosity )
+import Distribution.Dev.Sandbox ( resolveSandbox, localRepoPath
+                                , Sandbox
+                                )
 
 import Distribution.Simple.Utils ( debug )
 

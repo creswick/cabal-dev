@@ -9,11 +9,13 @@ module Distribution.Dev.Flags
     )
 where
 
-import Data.Maybe ( listToMaybe )
-import System.Console.GetOpt ( OptDescr(..), ArgOrder(..), ArgDescr(..), getOpt' )
-import Paths_cabal_dev ( getDataFileName )
+import Data.Maybe             ( listToMaybe )
+import Distribution.ReadE     ( runReadE )
 import Distribution.Verbosity ( Verbosity, normal, flagToVerbosity )
-import Distribution.ReadE ( runReadE )
+import Paths_cabal_dev        ( getDataFileName )
+import System.Console.GetOpt  ( OptDescr(..), ArgOrder(..), ArgDescr(..)
+                              , getOpt'
+                              )
 
 data GlobalFlag = Help
                 | Verbose String

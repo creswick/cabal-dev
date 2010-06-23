@@ -4,15 +4,21 @@ module Distribution.Dev.InitPkgDb
     )
 where
 
-#ifndef MIN_VERSION_Cabal
-#define MIN_VERSION_Cabal(a,b,c) 1
-#endif
 import Control.Monad ( unless )
 import qualified Distribution.Verbosity as V
-import Distribution.Version ( Version(..) )
 import Distribution.Simple.Program ( ghcPkgProgram, requireProgram
                                    , programVersion, ConfiguredProgram
                                    )
+import Distribution.Version ( Version(..) )
+
+
+-- This makes MIN_VERSION_Cabal testing use the first option in the
+-- absence of the macro (compilation without Cabal)
+#ifndef MIN_VERSION_Cabal
+#define MIN_VERSION_Cabal(a,b,c) 1
+#endif
+
+-- Select the appropriate imports for the version of Cabal
 #if MIN_VERSION_Cabal(1,8,0)
 import Distribution.Simple.Program ( runProgram )
 import Distribution.Simple.Program.Db ( emptyProgramDb )
@@ -23,10 +29,11 @@ import Distribution.Version ( VersionRange(AnyVersion) )
 #else
 #error Cabal version not supported
 #endif
+
 import System.Directory ( doesFileExist, doesDirectoryExist )
 
-import Distribution.Dev.LocalRepo ( Sandbox, pkgConf, PackageDbType(..)
-                                  , UnknownVersion, KnownVersion, setVersion )
+import Distribution.Dev.Sandbox ( Sandbox, pkgConf, PackageDbType(..)
+                                , UnknownVersion, KnownVersion, setVersion )
 
 -- |Initialize a package database.
 --

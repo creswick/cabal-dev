@@ -16,7 +16,7 @@ import Control.Monad             ( liftM )
 import Distribution.Simple.Utils ( withUTF8FileContents, writeUTF8File )
 import Distribution.ParseUtils   ( readFields, ParseResult(..), Field(..) )
 import System.Directory          ( canonicalizePath, getHomeDirectory )
-import Distribution.Dev.LocalRepo ( Sandbox, KnownVersion, pkgConf )
+import Distribution.Dev.Sandbox  ( Sandbox, KnownVersion, pkgConf )
 import Text.PrettyPrint.HughesPJ
 
 -- |Rewrite a cabal-install config file so that all paths are made

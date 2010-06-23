@@ -1,5 +1,5 @@
 {-# LANGUAGE GADTs, EmptyDataDecls #-}
-module Distribution.Dev.LocalRepo
+module Distribution.Dev.Sandbox
     ( defaultSandbox
     , resolveSandbox
     , getSandbox
@@ -31,7 +31,8 @@ data Sandbox a where
 
 data PackageDbType = GHC_6_10_Db | GHC_6_12_Db
 
--- XXX: re: compilation warnings
+-- NOTE: GHC 6.10: compilation warnings about non-exhaustive pattern
+-- matches are spurious
 setVersion :: Sandbox UnknownVersion -> PackageDbType -> Sandbox KnownVersion
 setVersion (UnknownVersion p) ty = KnownVersion p ty
 

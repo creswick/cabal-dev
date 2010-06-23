@@ -11,11 +11,11 @@ import System.Console.GetOpt ( usageInfo, getOpt, ArgOrder(Permute), getOpt' )
 
 import Distribution.Dev.Command ( CommandActions(..), CommandResult(..) )
 import Distribution.Dev.Flags ( parseGlobalFlags, helpRequested, globalOpts, GlobalFlag )
-import qualified Distribution.Dev.MkRepo as MkRepo
+import qualified Distribution.Dev.AddSource as AddSource
 import qualified Distribution.Dev.InvokeCabal as InvokeCabal
 
 allCommands :: [(String, CommandActions)]
-allCommands = [ ("add-source", MkRepo.actions)
+allCommands = [ ("add-source", AddSource.actions)
               , cabal "install"
               , cabal "update"
               , cabal "list"

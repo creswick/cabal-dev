@@ -5,8 +5,9 @@ module Distribution.Dev.Command
     )
 where
 
-import Distribution.Dev.Flags ( GlobalFlag )
 import System.Console.GetOpt ( OptDescr(..) )
+
+import Distribution.Dev.Flags ( GlobalFlag )
 
 data CommandResult = CommandError String | CommandOk
 

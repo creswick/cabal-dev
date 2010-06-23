@@ -2,8 +2,11 @@
 set -e
 set -x
 
-PATH="${HOME}/haskell/runtime/haskell-platform-2009.2.0.2/bin:${PATH}"
 SANDBOX=cabal-dev
+
+# We can't use the cabal-dev code until we know that we have the
+# dependencies installed, and we need this bootstrapping done to
+# install those dependencies into a sandbox.
 
 # Bootstrap package db. cabal-dev can do this, but we want to build
 # cabal-dev itself in a sandbox
@@ -26,6 +29,10 @@ function init-pkg-db {
     esac
 }
 
+# re-write the cabal-install config file to have absolute paths and
+# reference the correct package database. This is a hacky
+# implementation of the same thing that
+# Distribution.Dev.RewriteCabalConfig does.
 rewriteCabalConfig () {
     CFGIN="$1"
     CFGOUT="$2"
@@ -45,3 +52,6 @@ init-pkg-db
 rewriteCabalConfig admin/cabal-config.in "${SANDBOX}/cabal.config"
 cabal --config-file="${SANDBOX}/cabal.config" install
 "${SANDBOX}/bin/cabal-dev" add-source .
+
+# re-install from the packaged version, to make sure the packaging is sane
+"${SANDBOX}/bin/cabal-dev" install cabal-dev

@@ -2,16 +2,21 @@ module Distribution.Dev.InvokeCabal
     ( actions )
 where
 
-import Control.Arrow ( left, right )
-import Distribution.Dev.LocalRepo ( resolveSandbox, cabalConf )
-import Distribution.Dev.Flags ( GlobalFlag, getCabalConfig, getVerbosity )
-import Distribution.Dev.InitPkgDb ( initPkgDb )
-import Distribution.Dev.RewriteCabalConfig ( rewriteCabalConfig )
-import Distribution.Dev.Command ( CommandActions(..), CommandResult(..) )
+import Control.Arrow          ( left, right )
 import Distribution.Verbosity ( Verbosity, showForCabal )
-import System.Console.GetOpt ( OptDescr )
-import System.Exit ( ExitCode(..) )
-import System.Process ( rawSystem )
+import System.Console.GetOpt  ( OptDescr )
+import System.Exit            ( ExitCode(..) )
+import System.Process         ( rawSystem )
+
+import Distribution.Dev.Command            ( CommandActions(..)
+                                           , CommandResult(..)
+                                           )
+import Distribution.Dev.Flags              ( GlobalFlag, getCabalConfig
+                                           , getVerbosity
+                                           )
+import Distribution.Dev.InitPkgDb          ( initPkgDb )
+import Distribution.Dev.RewriteCabalConfig ( rewriteCabalConfig )
+import Distribution.Dev.Sandbox            ( resolveSandbox, cabalConf )
 
 actions :: String -> CommandActions
 actions act = CommandActions
