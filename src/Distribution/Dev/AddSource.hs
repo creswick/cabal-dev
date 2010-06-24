@@ -6,20 +6,30 @@ add-source command
 Puts local source packages into a repository readable by cabal-install
 
 -}
+{-# LANGUAGE CPP #-}
 module Distribution.Dev.AddSource
     ( actions
     )
 where
 
+#ifndef MIN_VERSION_Cabal
+#define MIN_VERSION_Cabal(a,b,c) 1
+#endif
+
 import Control.Applicative                   ( (<$>), (<*>) )
 import Control.Arrow                         ( right )
-import Control.Exception                     ( bracket, catchJust )
+import Control.Exception                     ( bracket )
 import Control.Monad                         ( guard, (<=<), forM_ )
-import Distribution.Package                  ( PackageName(..)
-                                             , PackageIdentifier(..)
-                                             )
 import Distribution.PackageDescription       ( packageDescription, package )
+import Distribution.Package                  ( PackageIdentifier(..) )
+#if MIN_VERSION_Cabal(1,6,0)
 import Distribution.PackageDescription.Parse ( readPackageDescription )
+import Distribution.Package                  ( PackageName(..) )
+#elif MIN_VERSION_Cabal(1,4,0)
+import Distribution.PackageDescription       ( readPackageDescription )
+#else
+#error Unsupported Cabal version
+#endif
 import Distribution.Text                     ( simpleParse, display )
 import System.Cmd                            ( rawSystem )
 import System.Console.GetOpt                 ( OptDescr(..) )
@@ -127,8 +137,10 @@ toIndexEntry pkgId c = right toEnt $ T.toTarPath False (indexName pkgId)
 -- entries.
 readExistingIndex :: Sandbox a -> IO (Either String [T.Entry])
 readExistingIndex localRepo =
-    catchJust (guard . isDoesNotExistError) readIndexFile $ \() ->
-        return $ Right []
+    readIndexFile `catch` \e ->
+        if isDoesNotExistError e
+        then return $ Right []
+        else ioError e
     where
       readIndexFile = withFile (indexTar localRepo) ReadMode
                       (forceEntries . T.read <=< L.hGetContents)
@@ -211,15 +223,29 @@ processTarball fn =
              -- Force reading the cabal file before we exit withFile
              Just res -> forceBS (snd res) >> return (Right res)
 
+#if MIN_VERSION_Cabal(1,6,0)
+mkPackageName :: String -> PackageName
+mkPackageName = PackageName
+displayPackageName :: PackageName -> String
+displayPackageName = display
+#elif MIN_VERSION_Cabal(1,4,0)
+mkPackageName :: String -> String
+mkPackageName = id
+displayPackageName :: String -> String
+displayPackageName = id
+#else
+#error Unsupported cabal version
+#endif
+
 -- |Extract the index information from a directory containing a cabal
 -- file
 processDirectory :: FilePath
                  -> IO (Either String (PackageIdentifier, L.ByteString))
-processDirectory d = catchJust selectExpected go $ \e ->
-                     return $ Left $ show e
+processDirectory d = go `catch` \e ->
+                     if expected e
+                     then return $ Left $ show e
+                     else ioError e
     where
-      selectExpected e = guard (expected e) >> return e
-
       expected e = any ($ e) [ isDoesNotExistError
                              ]
 
@@ -234,14 +260,13 @@ processDirectory d = catchJust selectExpected go $ \e ->
         let fn = d </> c
         pkgId <- package . packageDescription <$>
                  readPackageDescription V.normal fn
-        if PackageName (takeBaseName c) == pkgName pkgId
+        if mkPackageName (takeBaseName c) == pkgName pkgId
           then do
             cabalFile <- withFile fn ReadMode $
                          forcedBS <=< L.hGetContents
             return $ Right (pkgId, cabalFile)
           else
-            return $ Left $ "Package name does not match cabal \ 
-                            \file name: " ++ fn
+            return $ Left $ "Package name does not match cabal file name: " ++ fn
 
 -- |Force a lazy ByteString to be read
 forceBS :: L.ByteString -> IO ()
@@ -262,7 +287,7 @@ extractCabalFile = T.foldEntries step Nothing (const Nothing)
           case splitDirectories $ T.entryPath ent of
             [d, f] ->
                 do i <- simpleParse d
-                   let cabalName = PackageName $ takeBaseName f
+                   let cabalName = mkPackageName $ takeBaseName f
                    guard $ isCabalFile f && cabalName == pkgName i
                    return i
             _      -> Nothing
@@ -284,14 +309,15 @@ isTarball fn = (ext2, ext1) == (".tar", ".gz")
 
 -- |The path to the .cabal file in the 00-index.tar file
 indexName :: PackageIdentifier -> FilePath
-indexName pkgId = repoDir pkgId </> (display (pkgName pkgId) <.> "cabal")
+indexName pkgId = repoDir pkgId </>
+                  (displayPackageName (pkgName pkgId) <.> "cabal")
 
 -- |The path to the tarball in the local repository
 tarballName :: PackageIdentifier -> FilePath
 tarballName pkgId = repoDir pkgId </> (display pkgId <.> "tar" <.> "gz")
 
 repoDir :: PackageIdentifier -> FilePath
-repoDir pkgId = display (pkgName pkgId) </>
+repoDir pkgId = displayPackageName (pkgName pkgId) </>
                 display (pkgVersion pkgId)
 
 -- |The name of the cabal-install package index

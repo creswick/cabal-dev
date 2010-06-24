@@ -1,8 +1,31 @@
 Name:                cabal-dev
 Version:             0.1
-Synopsis:            Manage projects with several development cabal packages
-Description:         Tool for managing development builds of Haskell projects that consist of multiple not-yet-released cabal packagges
--- Description:
+Synopsis:            Manage sandboxed Haskell build environments
+
+Description:         cabal-dev is a tool for managing development builds of
+                     Haskell projects. It supports maintaining sandboxed
+                     cabal-install repositories, and sandboxed ghc package
+                     databases.
+                     .
+                     By default, it uses a cabal-dev directory under
+                     the current working directory as the sandbox.
+                     .
+                     For most packages, just use @cabal-dev@ instead of
+                     @cabal@, and you will get a sandboxed build that
+                     will not install anything (even automatically installed
+                     dependencies) into the user or global ghc package
+                     databases.
+                     .
+                     If your build depends on patched or unreleased libraries,
+                     you can add them to your sandboxed build environment so
+                     they can be installed by @cabal-dev@ or @cabal@. Just run:
+                     .
+                     > cabal-dev add-source /path/to/source/code
+                     .
+                     @cabal-dev add-source@ also supports importing tarballs
+                     into a local cabal repository.
+                     .
+                     This tool has been tested with GHC 6.8-6.12.
 
 License:             BSD3
 License-file:        LICENSE
@@ -11,9 +34,15 @@ Maintainer:          j3h@galois.com
 Copyright:           2010 Galois, Inc.
 Category:            Development
 Build-type:          Simple
-Cabal-version:       >=1.6
+Cabal-version:       >=1.2
 Data-Files:
   admin/cabal-config.in
+
+Executable ghc-pkg-6.8-compat
+  Main-is: GhcPkgCompat.hs
+  Build-Depends: Cabal >=1.4 && < 1.9
+  GHC-Options: -Wall
+  HS-Source-Dirs: src
 
 Executable cabal-dev
   HS-Source-Dirs: src
@@ -22,20 +51,20 @@ Executable cabal-dev
 
   if impl(ghc >= 6.10)
     Build-depends:
-      base == 4.*
+      base >= 4 && < 5
   else
     Build-depends:
-      base == 3.*
+      base >= 3 && < 4
 
   Build-depends:
-    bytestring == 0.9.*,
-    directory == 1.0.*,
-    filepath == 1.1.*,
-    Cabal >= 1.6 && < 1.9,
-    pretty == 1.0.*,
-    process == 1.0.*,
-    tar == 0.3.*,
-    zlib == 0.5.*
+    bytestring >= 0.9 && < 0.10,
+    directory >= 1.0 && < 1.1,
+    filepath >= 1.1 && < 1.2,
+    Cabal >= 1.4 && < 1.9,
+    pretty >= 1.0 && < 1.1,
+    process >= 1.0 && < 1.1,
+    tar >= 0.3 && < 0.4,
+    zlib >= 0.5 && < 0.6
 
   Other-modules:
     Distribution.Dev.AddSource,

@@ -9,6 +9,7 @@ module Distribution.Dev.Sandbox
     , cabalConf
     , PackageDbType(..)
     , setVersion
+    , getVersion
     , UnknownVersion
     , KnownVersion
     )
@@ -29,12 +30,16 @@ data Sandbox a where
     UnknownVersion :: FilePath -> Sandbox UnknownVersion
     KnownVersion :: FilePath -> PackageDbType -> Sandbox KnownVersion
 
-data PackageDbType = GHC_6_10_Db | GHC_6_12_Db
+data PackageDbType = GHC_6_8_Db FilePath | GHC_6_10_Db | GHC_6_12_Db
 
--- NOTE: GHC 6.10: compilation warnings about non-exhaustive pattern
--- matches are spurious
+-- NOTE: GHC < 6.12: compilation warnings about non-exhaustive pattern
+-- matches are spurious (we'd get a type error if we tried to make
+-- them complete!)
 setVersion :: Sandbox UnknownVersion -> PackageDbType -> Sandbox KnownVersion
 setVersion (UnknownVersion p) ty = KnownVersion p ty
+
+getVersion :: Sandbox KnownVersion -> PackageDbType
+getVersion (KnownVersion _ db) = db
 
 sandbox :: Sandbox a -> FilePath
 sandbox (UnknownVersion p) = p
@@ -49,7 +54,8 @@ localRepoPath = sPath "packages"
 pkgConf :: Sandbox KnownVersion -> FilePath
 pkgConf s@(KnownVersion _ ty) = sPath (packageDbName ty) s
     where
-      packageDbName GHC_6_10_Db = "packages.conf"
+      packageDbName (GHC_6_8_Db _) = "packages-6.8.conf"
+      packageDbName GHC_6_10_Db = "packages-6.10.conf"
       packageDbName GHC_6_12_Db = "packages.conf.d"
 
 cabalConf :: Sandbox a -> FilePath

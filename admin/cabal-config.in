@@ -46,7 +46,7 @@ remote-build-reporting: anonymous
 -- password:
 
 install-dirs user
-  -- prefix: ~/.cabal
+  prefix: ./cabal-dev
   -- bindir: $prefix/bin
   -- libdir: $prefix/lib
   -- libsubdir: $pkgid/$compiler

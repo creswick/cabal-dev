@@ -8,6 +8,7 @@ import Control.Monad ( unless )
 import qualified Distribution.Verbosity as V
 import Distribution.Simple.Program ( ghcPkgProgram, requireProgram
                                    , programVersion, ConfiguredProgram
+                                   , programLocation, locationPath
                                    )
 import Distribution.Version ( Version(..) )
 
@@ -22,7 +23,7 @@ import Distribution.Version ( Version(..) )
 #if MIN_VERSION_Cabal(1,8,0)
 import Distribution.Simple.Program ( runProgram )
 import Distribution.Simple.Program.Db ( emptyProgramDb )
-#elif MIN_VERSION_Cabal(1,6,0)
+#elif MIN_VERSION_Cabal(1,2,0)
 import Distribution.Simple.Program ( rawSystemProgram
                                    , emptyProgramConfiguration )
 import Distribution.Version ( VersionRange(AnyVersion) )
@@ -50,7 +51,7 @@ initPkgDb s = do
 #if MIN_VERSION_Cabal(1,8,0)
   let require v p = requireProgram v p emptyProgramDb
       run     = runProgram
-#elif MIN_VERSION_Cabal(1,6,0)
+#elif MIN_VERSION_Cabal(1,2,0)
   let require v p = requireProgram v p AnyVersion emptyProgramConfiguration
       run     = rawSystemProgram
 #else
@@ -63,17 +64,18 @@ initPkgDb s = do
       pth = pkgConf s'
 
   case typ of
-    GHC_6_10_Db -> do
-      e <- doesFileExist pth
-      unless e $ writeFile pth "[]"
     GHC_6_12_Db -> do
       e <- doesDirectoryExist pth
       unless e $ run V.normal ghcPkg ["init", pth]
+    _ -> do
+      e <- doesFileExist pth
+      unless e $ writeFile pth "[]"
   return s'
 
 ghcPackageDbType :: ConfiguredProgram -> PackageDbType
 ghcPackageDbType p =
     case programVersion p of
       Nothing -> error "Unknown ghc version!"
-      Just v | v < Version [6, 12] [] -> GHC_6_10_Db
+      Just v | v < Version [6, 10] [] -> (GHC_6_8_Db $ locationPath $ programLocation p)
+             | v < Version [6, 12] [] -> GHC_6_10_Db
              | otherwise              -> GHC_6_12_Db

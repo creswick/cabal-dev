@@ -13,8 +13,12 @@ SANDBOX=cabal-dev
 function init-pkg-db {
     VER_STR="$(ghc-pkg --version)"
     case "$VER_STR" in
+        "GHC package manager version 6.8."*)
+            PKGDB=${SANDBOX}/packages-6.8.conf
+            [ -f "${PKGDB}" ] || echo -n "[]" > "${PKGDB}"
+            ;;
         "GHC package manager version 6.10."*)
-            PKGDB=${SANDBOX}/packages.conf
+            PKGDB=${SANDBOX}/packages-6.10.conf
             [ -f "${PKGDB}" ] || echo -n "[]" > "${PKGDB}"
             ;;
         "GHC package manager version 6.12."*)
@@ -51,6 +55,13 @@ mkdir -p $SANDBOX
 init-pkg-db
 rewriteCabalConfig admin/cabal-config.in "${SANDBOX}/cabal.config"
 cabal --config-file="${SANDBOX}/cabal.config" install
+
+cat <<EOF
+==================================================
+Now using the compiled binary:
+
+EOF
+
 "${SANDBOX}/bin/cabal-dev" add-source .
 
 # re-install from the packaged version, to make sure the packaging is sane

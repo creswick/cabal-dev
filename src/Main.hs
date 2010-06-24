@@ -5,7 +5,7 @@ where
 
 import Data.Maybe ( listToMaybe )
 import Control.Monad ( unless )
-import System.Exit ( exitFailure, exitSuccess )
+import System.Exit ( exitWith, ExitCode(..) )
 import System.Environment ( getArgs, getProgName )
 import System.Console.GetOpt ( usageInfo, getOpt, ArgOrder(Permute), getOpt' )
 
@@ -39,7 +39,7 @@ main = do
   unless (null errs) $ do
          mapM_ putStrLn errs
          putStr =<< globalUsage
-         exitFailure
+         exitWith (ExitFailure 1)
 
   case args of
     (name:args') ->
@@ -47,14 +47,14 @@ main = do
           Just cmdAct -> runCmd cmdAct globalFlags args'
           Nothing -> do putStrLn $ "Unknown command: " ++ show name
                         putStr =<< globalUsage
-                        exitFailure
+                        exitWith (ExitFailure 1)
     _ | helpRequested globalFlags -> do
               putStr =<< globalUsage
-              exitSuccess
+              exitWith ExitSuccess
       | otherwise -> do
               putStrLn "Missing command name"
               putStr =<< globalUsage
-              exitFailure
+              exitWith (ExitFailure 1)
 
 globalUsage :: IO String
 globalUsage = do
@@ -82,18 +82,18 @@ runCmd cmdAct flgs args
     | helpRequested flgs = showHelp
     | otherwise = do res <- run
                      case res of
-                       CommandOk        -> exitSuccess
+                       CommandOk        -> exitWith ExitSuccess
                        CommandError msg -> showError [msg]
     where
       showError msgs = do
         putStr $ unlines $ "FAILED:":msgs ++ [replicate 50 '-', cmdDesc cmdAct]
         putStr =<< globalUsage
-        exitFailure
+        exitWith (ExitFailure 1)
 
       showHelp = do
         putStrLn $ cmdDesc cmdAct
         putStr =<< globalUsage
-        exitSuccess
+        exitWith ExitSuccess
 
       run = case cmdAct of
               (CommandActions _ r o passFlags) ->
