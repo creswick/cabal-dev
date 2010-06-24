@@ -81,7 +81,7 @@ actions = CommandActions
             }
 
 addSources :: [GlobalFlag] -> [String] -> IO CommandResult
-addSources _    [] = return $ CommandError "No local package locations supplied"
+addSources _    [] = return $ CommandError "No package locations supplied"
 addSources flgs fns = do
   sandbox <- resolveSandbox flgs
   let v = getVerbosity flgs
