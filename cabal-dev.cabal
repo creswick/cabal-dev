@@ -1,5 +1,5 @@
 Name:                cabal-dev
-Version:             0.2
+Version:             0.2.1
 Synopsis:            Manage sandboxed Haskell build environments
 
 Description:         cabal-dev is a tool for managing development builds of
@@ -61,6 +61,9 @@ Executable cabal-dev
     directory >= 1.0 && < 1.1,
     filepath >= 1.1 && < 1.2,
     Cabal >= 1.4 && < 1.9,
+    HTTP == 4000.0.9,
+    mtl >= 1.1 && < 1.2,
+    network >= 2.2 && < 2.3,
     pretty >= 1.0 && < 1.1,
     process >= 1.0 && < 1.1,
     tar >= 0.3 && < 0.4,

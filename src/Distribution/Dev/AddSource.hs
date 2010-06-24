@@ -20,6 +20,9 @@ import Control.Applicative                   ( (<$>), (<*>) )
 import Control.Arrow                         ( right )
 import Control.Exception                     ( bracket )
 import Control.Monad                         ( guard, (<=<), forM_ )
+import Control.Monad.Error                   ( runErrorT, throwError )
+import Control.Monad.Trans                   ( liftIO )
+import Data.List                             ( isPrefixOf )
 import Distribution.PackageDescription       ( packageDescription, package )
 import Distribution.Package                  ( PackageIdentifier(..) )
 #if MIN_VERSION_Cabal(1,6,0)
@@ -31,6 +34,11 @@ import Distribution.PackageDescription       ( readPackageDescription )
 #error Unsupported Cabal version
 #endif
 import Distribution.Text                     ( simpleParse, display )
+import Network.HTTP                          ( mkRequest, RequestMethod(GET)
+                                             , rspBody, simpleHTTP
+                                             )
+import Network.URI                           ( parseURI, uriScheme, URI
+                                             , uriPath )
 import System.Cmd                            ( rawSystem )
 import System.Console.GetOpt                 ( OptDescr(..) )
 import System.Directory                      ( getDirectoryContents
@@ -38,6 +46,7 @@ import System.Directory                      ( getDirectoryContents
                                              , getCurrentDirectory
                                              , setCurrentDirectory
                                              , createDirectoryIfMissing
+                                             , getTemporaryDirectory
                                              )
 import System.Exit                           ( ExitCode(..) )
 import System.FilePath                       ( takeExtension, takeBaseName
@@ -74,9 +83,9 @@ actions = CommandActions
 addSources :: [GlobalFlag] -> [String] -> IO CommandResult
 addSources _    [] = return $ CommandError "No local package locations supplied"
 addSources flgs fns = do
-  localRepo <- resolveSandbox flgs
+  sandbox <- resolveSandbox flgs
   let v = getVerbosity flgs
-  debug v $ "Making a cabal repo in " ++ localRepoPath localRepo ++
+  debug v $ "Making a cabal repo in " ++ localRepoPath sandbox ++
             " out of " ++ show fns
   results <- mapM (processLocalSource v) fns
   let errs = [e | Left e <- results]
@@ -86,7 +95,7 @@ addSources flgs fns = do
              "Errors finding cabal files:":map (showString "  ") errs
     else do
       let (sources, newEntries) = unzip srcs
-      res <- readExistingIndex localRepo
+      res <- readExistingIndex sandbox
       case res of
         Left err -> return $
                     CommandError $ "Error reading existing index: " ++ err
@@ -97,24 +106,24 @@ addSources flgs fns = do
                -- contain a cabal package (or at least a .cabal file)
                --
                -- Now to install the tarballs for the directories:
-               forM_ (zip sources fns) $ \((src, pkgId), fn) ->
-                   installTarball flgs localRepo src pkgId fn
+               forM_ sources $ \(src, pkgId) ->
+                   installTarball flgs sandbox src pkgId
 
                -- and now that the tarballs are in place, write out the
                -- updated index
-               writeIndex localRepo newIndex
+               writeIndex sandbox newIndex
                return CommandOk
 
 -- |Atomically write an index tarball in the supplied directory
 writeIndex :: Sandbox a -- ^The local repository path
            -> [T.Entry] -- ^The index entries
            -> IO ()
-writeIndex localRepo ents =
+writeIndex sandbox ents =
     do newIndexName <- withTmpIndex $ \(fn, h) ->
                        L.hPut h (T.write ents) >> return fn
-       renameFile newIndexName $ indexTar localRepo
+       renameFile newIndexName $ indexTar sandbox
     where
-      pth = localRepoPath localRepo
+      pth = localRepoPath sandbox
       withTmpIndex = bracket (openTempFile pth indexTarBase) (hClose . snd)
 
 -- |Merge two lists of tar entries, filtering out the entries from the
@@ -136,13 +145,13 @@ toIndexEntry pkgId c = right toEnt $ T.toTarPath False (indexName pkgId)
 -- exists. If the file does not exist, behave as if the index has no
 -- entries.
 readExistingIndex :: Sandbox a -> IO (Either String [T.Entry])
-readExistingIndex localRepo =
+readExistingIndex sandbox =
     readIndexFile `catch` \e ->
         if isDoesNotExistError e
         then return $ Right []
         else ioError e
     where
-      readIndexFile = withFile (indexTar localRepo) ReadMode
+      readIndexFile = withFile (indexTar sandbox) ReadMode
                       (forceEntries . T.read <=< L.hGetContents)
       forceEntries es =
         let step _ l@(Left _) = l
@@ -152,36 +161,41 @@ readExistingIndex localRepo =
 
 
 -- |What kind of package source is this?
-data LocalSource = DirPkg | TarPkg
+data LocalSource = DirPkg FilePath | TarPkg FilePath deriving Show
 
 -- |Determine if this filename looks like a tarball (otherwise, it
 -- assumes that it's a directory and treats it as such)
-classifyLocalSource :: FilePath -> LocalSource
-classifyLocalSource fn | isTarball fn = TarPkg
-                       | otherwise    = DirPkg
+classifyLocalSource :: String -> Either URI LocalSource
+classifyLocalSource fn =
+    case parseURI fn of
+      Just u | isHttpUri u && isTarGzUri u -> Left u
+      _      | isTarball fn                -> Right $ TarPkg fn
+             | otherwise                   -> Right $ DirPkg fn
+    where
+      isHttpUri = (`elem` ["http:", "https:"]) . uriScheme
+      isTarGzUri = (reverse ".tar.gz" `isPrefixOf`) . reverse . uriPath
 
 -- |Put the tarball for this package in the local repository
 installTarball :: [GlobalFlag]
                -> Sandbox a -- ^Location of the local repository
                -> LocalSource -- ^What kind of package source
                -> PackageIdentifier
-               -> FilePath -- ^Where the package is in the filesystem
                -> IO (Either String ())
-installTarball flgs localRepo src pkgId fn =
-    do createDirectoryIfMissing True $ localRepoPath localRepo </> repoDir pkgId
+installTarball flgs sandbox src pkgId =
+    do createDirectoryIfMissing True $ localRepoPath sandbox </> repoDir pkgId
        case src of
-         TarPkg -> do copyFile fn dest
-                      return $ Right ()
-         DirPkg -> do
-                  res <- makeSDist
+         TarPkg fn -> do copyFile fn dest
+                         return $ Right ()
+         DirPkg fn -> do
+                  res <- makeSDist fn
                   case res of
                     Left err -> return $ Left err
                     Right tarFn -> do
                              renameFile tarFn dest
                              return $ Right ()
     where
-      dest = localRepoPath localRepo </> tarballName pkgId
-      makeSDist = do
+      dest = localRepoPath sandbox </> tarballName pkgId
+      makeSDist fn = do
         debug (getVerbosity flgs) $ "Running cabal sdist in " ++ fn
         bracket getCurrentDirectory setCurrentDirectory $ \_ -> do
                     setCurrentDirectory fn
@@ -195,21 +209,39 @@ installTarball flgs localRepo src pkgId fn =
                           return $ Left $
                                   "cabal sdist failed with " ++ show code
 
+downloadTarball :: URI -> IO (Either String FilePath)
+downloadTarball u = do
+  tmpLoc <- getTemporaryDirectory
+  bracket (openTempFile tmpLoc "package-.tar.gz") (hClose . snd) $ \(fn, h) ->
+      do httpRes <- simpleHTTP $ mkRequest GET u
+         case httpRes of
+           Left err -> return $ Left $ show err
+           Right resp ->
+               do L.hPut h $ rspBody resp
+                  return $ Right fn
+
 -- |Extract the index information from the supplied path, either as a
 -- tarball or as a local package directory
 processLocalSource :: V.Verbosity -> FilePath
                    -> IO (Either String ((LocalSource, PackageIdentifier), T.Entry))
-processLocalSource v fn = do
-  let src = classifyLocalSource fn
-  res <- case src of
-           TarPkg -> processTarball fn
-           DirPkg -> processDirectory v fn
-  case res of
-    Left err -> return $ Left $ "Processing package from " ++ fn ++ ": " ++
-                err
-    Right (pkgId, c) -> do
-             ent <- either fail return $ toIndexEntry pkgId c
-             return $ Right ((src, pkgId), ent)
+processLocalSource v fn =
+    runErrorT $ do
+      let cls = classifyLocalSource fn
+      liftIO $ print cls
+      src <- case cls of
+               Left u -> do
+                  liftIO $ putStrLn "Downloading"
+                  TarPkg `fmap` eitherErrorIO (downloadTarball u)
+               Right s -> return s
+      (pkgId, c) <- eitherErrorIO $
+                    case src of
+                      TarPkg x -> processTarball x
+                      DirPkg x -> processDirectory v x
+      ent <- eitherError $ toIndexEntry pkgId c
+      return ((src, pkgId), ent)
+    where
+      eitherError = either throwError return
+      eitherErrorIO = eitherError <=< liftIO
 
 -- |Extract the index information from a tarball
 processTarball :: FilePath
@@ -328,4 +360,4 @@ indexTarBase :: FilePath
 indexTarBase = "00-index.tar"
 
 indexTar :: Sandbox a -> FilePath
-indexTar lr = localRepoPath lr </> indexTarBase
+indexTar sandbox = localRepoPath sandbox </> indexTarBase
