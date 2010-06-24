@@ -16,6 +16,7 @@ import Distribution.Simple.Program   ( findProgramOnPath )
 #else
 #error Cabal version unsupported
 #endif
+import Distribution.Simple.Utils ( notice )
 import System.Console.GetOpt  ( OptDescr )
 import System.Directory       ( canonicalizePath )
 import System.Exit            ( ExitCode(..) )
@@ -53,17 +54,19 @@ actions act = CommandActions
 
 invokeCabal :: [GlobalFlag] -> [String] -> IO CommandResult
 invokeCabal flgs args = do
-  either (return . CommandError) (invokeCabalCfg . (++ args)) =<< setup flgs
+  let v = getVerbosity flgs
+  either (return . CommandError) (invokeCabalCfg v . (++ args)) =<< setup flgs
 
 setup :: [GlobalFlag] -> IO (Either String [String])
 setup flgs = do
-  s <- initPkgDb =<< resolveSandbox flgs
+  let v = getVerbosity flgs
+  s <- initPkgDb v =<< resolveSandbox flgs
   cfgIn <- getCabalConfig flgs
   let cfgOut = cabalConf s
   cfgRes <- rewriteCabalConfig cfgIn cfgOut s
   let qualifyError err =
           "Error processing cabal config file " ++ cfgIn ++ ": " ++ err
-  args <- extraArgs (getVerbosity flgs) cfgOut (getVersion s)
+  args <- extraArgs v cfgOut (getVersion s)
   return $
          left qualifyError $
          right (const $ args) $
@@ -89,8 +92,9 @@ extraArgs v cfg pdb =
                                        ]
             _ -> return []
 
-invokeCabalCfg :: [String] -> IO CommandResult
-invokeCabalCfg args = do
+invokeCabalCfg :: Verbosity -> [String] -> IO CommandResult
+invokeCabalCfg v args = do
+  notice v $ unwords $ "Invoking: cabal":args
   res <- rawSystem "cabal" args
   return $ case res of
              ExitSuccess      -> CommandOk

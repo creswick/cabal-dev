@@ -25,7 +25,6 @@ import Distribution.Simple.Utils ( rawSystemExit )
 import Control.Monad ( msum )
 import Data.Maybe ( fromMaybe, isJust )
 import System.Environment ( getArgs )
-import System.IO ( withFile, IOMode(AppendMode), hPutStrLn )
 
 dropCommonPrefix :: Eq a => [a] -> [a] -> ([a], [a])
 dropCommonPrefix (a:as) (b:bs) | a == b = dropCommonPrefix as bs
@@ -65,5 +64,4 @@ main = do
   let ghcPkg = ghcPkgExe args
       ghcPkgArgs = fixPackageDbSpec $ filter (not . shouldDrop) args
       v = silent
-  withFile "xxx" AppendMode $ \h -> hPutStrLn h $ show $ ghcPkg:ghcPkgArgs
   rawSystemExit v ghcPkg ghcPkgArgs

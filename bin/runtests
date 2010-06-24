@@ -13,14 +13,17 @@ function init-pkg-db {
     VER_STR="$(ghc-pkg --version)"
     case "$VER_STR" in
         "GHC package manager version 6.8."*)
+            GHCVER=6.8
             PKGDB=${SANDBOX}/packages-6.8.conf
             [ -f "${PKGDB}" ] || echo -n "[]" > "${PKGDB}"
             ;;
         "GHC package manager version 6.10."*)
+            GHCVER=6.10
             PKGDB=${SANDBOX}/packages-6.10.conf
             [ -f "${PKGDB}" ] || echo -n "[]" > "${PKGDB}"
             ;;
         "GHC package manager version 6.12."*)
+            GHCVER=6.12
             PKGDB=${SANDBOX}/packages.conf.d
             [ -d "${PKGDB}" ] || ghc-pkg init "${PKGDB}"
             ;;
@@ -53,8 +56,16 @@ rewriteCabalConfig () {
 mkdir -p $SANDBOX
 init-pkg-db
 rewriteCabalConfig admin/cabal-config.in "${SANDBOX}/cabal.config"
-cabal --config-file="${SANDBOX}/cabal.config" install
-
+case ${GHCVER} in
+    6.8)
+        CABALARGS="--with-ghc-pkg=$(which ghc-pkg-6.8-compat) \
+            --ghc-pkg-options=--with-ghc-pkg=$(which ghc-pkg)"
+        ;;
+    *)
+        CABALARGS=
+        ;;
+esac
+cabal ${CABALARGS} --config-file="${SANDBOX}/cabal.config" install
 cat <<EOF
 ==================================================
 Now using the compiled binary:

@@ -11,7 +11,7 @@ import Distribution.Simple.Program ( ghcPkgProgram, requireProgram
                                    , programLocation, locationPath
                                    )
 import Distribution.Version ( Version(..) )
-
+import Distribution.Verbosity ( Verbosity )
 
 -- This makes MIN_VERSION_Cabal testing use the first option in the
 -- absence of the macro (compilation without Cabal)
@@ -46,19 +46,19 @@ import Distribution.Dev.Sandbox ( Sandbox, pkgConf, PackageDbType(..)
 -- different GHC versions, but the cabal-install config file just sets
 -- one location. We'd have to have the GHC version before writing the
 -- cabal config file.
-initPkgDb :: Sandbox UnknownVersion -> IO (Sandbox KnownVersion)
-initPkgDb s = do
+initPkgDb :: Verbosity -> Sandbox UnknownVersion -> IO (Sandbox KnownVersion)
+initPkgDb v s = do
 #if MIN_VERSION_Cabal(1,8,0)
-  let require v p = requireProgram v p emptyProgramDb
+  let require p = requireProgram v p emptyProgramDb
       run     = runProgram
 #elif MIN_VERSION_Cabal(1,2,0)
-  let require v p = requireProgram v p AnyVersion emptyProgramConfiguration
+  let require p = requireProgram v p AnyVersion emptyProgramConfiguration
       run     = rawSystemProgram
 #else
 #error Cabal version not supported
 #endif
 
-  ghcPkg <- fst `fmap` require V.normal ghcPkgProgram
+  ghcPkg <- fst `fmap` require ghcPkgProgram
   let typ = ghcPackageDbType ghcPkg
       s' = setVersion s typ
       pth = pkgConf s'
@@ -66,7 +66,7 @@ initPkgDb s = do
   case typ of
     GHC_6_12_Db -> do
       e <- doesDirectoryExist pth
-      unless e $ run V.normal ghcPkg ["init", pth]
+      unless e $ run v ghcPkg ["init", pth]
     _ -> do
       e <- doesFileExist pth
       unless e $ writeFile pth "[]"
@@ -76,6 +76,8 @@ ghcPackageDbType :: ConfiguredProgram -> PackageDbType
 ghcPackageDbType p =
     case programVersion p of
       Nothing -> error "Unknown ghc version!"
-      Just v | v < Version [6, 10] [] -> (GHC_6_8_Db $ locationPath $ programLocation p)
+      Just v | v < Version [6, 10] [] -> GHC_6_8_Db $
+                                         locationPath $
+                                         programLocation p
              | v < Version [6, 12] [] -> GHC_6_10_Db
              | otherwise              -> GHC_6_12_Db
