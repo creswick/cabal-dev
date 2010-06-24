@@ -4,15 +4,21 @@ module Main
 where
 
 import Data.Maybe ( listToMaybe )
+import Data.Version ( showVersion )
 import Control.Monad ( unless )
 import System.Exit ( exitWith, ExitCode(..) )
 import System.Environment ( getArgs, getProgName )
 import System.Console.GetOpt ( usageInfo, getOpt, ArgOrder(Permute), getOpt' )
+import Distribution.Simple.Utils ( cabalVersion )
+import Distribution.Text ( display )
 
 import Distribution.Dev.Command ( CommandActions(..), CommandResult(..) )
-import Distribution.Dev.Flags ( parseGlobalFlags, helpRequested, globalOpts, GlobalFlag )
+import Distribution.Dev.Flags ( parseGlobalFlags, helpRequested, globalOpts
+                              , GlobalFlag(Version)
+                              )
 import qualified Distribution.Dev.AddSource as AddSource
 import qualified Distribution.Dev.InvokeCabal as InvokeCabal
+import Paths_cabal_dev ( version )
 
 allCommands :: [(String, CommandActions)]
 allCommands = [ ("add-source", AddSource.actions)
@@ -33,6 +39,19 @@ allCommands = [ ("add-source", AddSource.actions)
     where
       cabal s = (s, InvokeCabal.actions s)
 
+printVersion :: IO ()
+printVersion = do
+  putStr $ unlines $
+             [ "cabal-dev " ++ showVersion version
+             , "built with Cabal " ++ display cabalVersion
+             ]
+  exitWith ExitSuccess
+
+printNumericVersion :: IO ()
+printNumericVersion = do
+  putStrLn $ showVersion version
+  exitWith ExitSuccess
+
 main :: IO ()
 main = do
   (globalFlags, args, errs) <- parseGlobalFlags `fmap` getArgs
@@ -40,6 +59,11 @@ main = do
          mapM_ putStrLn errs
          putStr =<< globalUsage
          exitWith (ExitFailure 1)
+
+  case [f|(Version f) <- globalFlags] of
+    (True:_) -> printNumericVersion
+    (False:_) -> printVersion
+    [] -> return ()
 
   case args of
     (name:args') ->

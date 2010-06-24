@@ -31,6 +31,7 @@ data GlobalFlag = Help
                 | Verbose String
                 | Sandbox FilePath
                 | CabalConf FilePath
+                | Version Bool
                   deriving (Eq, Show)
 
 globalOpts :: [OptDescr GlobalFlag]
@@ -41,6 +42,10 @@ globalOpts = [ Option "h?" ["help"] (NoArg Help) "Show help text"
                "The location of the cabal-install config file (default: use included)"
              , Option "v" ["verbose"] (ReqArg Verbose "LEVEL")
                "Verbosity level: 0 (silent) - 3 (deafening)"
+             , Option "" ["version"] (NoArg (Version False))
+               "Show the version of this program"
+             , Option "" ["numeric-version"] (NoArg (Version True))
+               "Show a machine-readable version number"
              ]
 
 parseGlobalFlags :: [String] -> ([GlobalFlag], [String], [String])

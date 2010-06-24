@@ -61,24 +61,24 @@ import Distribution.Dev.Sandbox ( resolveSandbox, localRepoPath
                                 , Sandbox
                                 )
 
-import Distribution.Simple.Utils ( debug )
+import Distribution.Simple.Utils ( debug, notice )
 
 actions :: CommandActions
 actions = CommandActions
             { cmdDesc = "Add packages to a local cabal install repository"
-            , cmdRun = \flgs _ -> mkRepo flgs
+            , cmdRun = \flgs _ -> addSources flgs
             , cmdOpts = [] :: [OptDescr ()]
             , cmdPassFlags = False
             }
 
-mkRepo :: [GlobalFlag] -> [String] -> IO CommandResult
-mkRepo _    [] = return $ CommandError "No local package locations supplied"
-mkRepo flgs fns = do
+addSources :: [GlobalFlag] -> [String] -> IO CommandResult
+addSources _    [] = return $ CommandError "No local package locations supplied"
+addSources flgs fns = do
   localRepo <- resolveSandbox flgs
-  debug (getVerbosity flgs)
-            $ "Making a cabal repo in " ++ localRepoPath localRepo ++
+  let v = getVerbosity flgs
+  debug v $ "Making a cabal repo in " ++ localRepoPath localRepo ++
             " out of " ++ show fns
-  results <- mapM processLocalSource fns
+  results <- mapM (processLocalSource v) fns
   let errs = [e | Left e <- results]
       srcs = [s | Right s <- results]
   if not $ null errs
@@ -197,13 +197,13 @@ installTarball flgs localRepo src pkgId fn =
 
 -- |Extract the index information from the supplied path, either as a
 -- tarball or as a local package directory
-processLocalSource :: FilePath
+processLocalSource :: V.Verbosity -> FilePath
                    -> IO (Either String ((LocalSource, PackageIdentifier), T.Entry))
-processLocalSource fn = do
+processLocalSource v fn = do
   let src = classifyLocalSource fn
   res <- case src of
            TarPkg -> processTarball fn
-           DirPkg -> processDirectory fn
+           DirPkg -> processDirectory v fn
   case res of
     Left err -> return $ Left $ "Processing package from " ++ fn ++ ": " ++
                 err
@@ -226,11 +226,13 @@ processTarball fn =
 #if MIN_VERSION_Cabal(1,6,0)
 mkPackageName :: String -> PackageName
 mkPackageName = PackageName
+
 displayPackageName :: PackageName -> String
 displayPackageName = display
 #elif MIN_VERSION_Cabal(1,4,0)
 mkPackageName :: String -> String
 mkPackageName = id
+
 displayPackageName :: String -> String
 displayPackageName = id
 #else
@@ -239,9 +241,9 @@ displayPackageName = id
 
 -- |Extract the index information from a directory containing a cabal
 -- file
-processDirectory :: FilePath
+processDirectory :: V.Verbosity -> FilePath
                  -> IO (Either String (PackageIdentifier, L.ByteString))
-processDirectory d = go `catch` \e ->
+processDirectory v d = go `catch` \e ->
                      if expected e
                      then return $ Left $ show e
                      else ioError e
@@ -262,6 +264,7 @@ processDirectory d = go `catch` \e ->
                  readPackageDescription V.normal fn
         if mkPackageName (takeBaseName c) == pkgName pkgId
           then do
+            notice v $ "Building source dist at " ++ d ++ " for " ++ display pkgId
             cabalFile <- withFile fn ReadMode $
                          forcedBS <=< L.hGetContents
             return $ Right (pkgId, cabalFile)
