@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 set -e
-set -x
 
 SANDBOX=cabal-dev
 
@@ -62,7 +61,27 @@ Now using the compiled binary:
 
 EOF
 
+checkExitSuccess () {
+    echo -n "Checking exit status for args: $@ ... "
+    "${SANDBOX}/bin/cabal-dev" "$@" > /dev/null
+    if [ "$?" -ne "0" ]
+    then
+        echo FAILED
+        exit 1
+    else
+        echo ok.
+    fi
+}
+
+# Since set -e is on, these commands just check to make sure that
+# these flags exit with success:
+checkExitSuccess --version
+checkExitSuccess --numeric-version
+checkExitSuccess --help
+
+# Make an sdist for the current source tree and put it in the index
+# for the sandbox repo
 "${SANDBOX}/bin/cabal-dev" add-source .
 
-# re-install from the packaged version, to make sure the packaging is sane
+# re-install from the sdist version, to make sure the packaging is sane
 "${SANDBOX}/bin/cabal-dev" install cabal-dev
