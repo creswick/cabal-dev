@@ -11,13 +11,13 @@ import Distribution.Verbosity ( Verbosity, showForCabal )
 import Distribution.Simple.Program ( Program(programFindVersion)
                                    , findProgramVersion
                                    , simpleProgram
-                                   , findProgramLocation
                                    , runProgram
                                    , requireProgram
+                                   , programLocation
+                                   , locationPath
                                    )
 import Distribution.Simple.Program.Db ( emptyProgramDb )
 import System.Console.GetOpt  ( OptDescr )
-import System.Directory       ( canonicalizePath )
 
 import Distribution.Dev.Command            ( CommandActions(..)
                                            , CommandResult(..)
@@ -71,20 +71,28 @@ extraArgs v cfg pdb =
     do pdbArgs <- getPdbArgs
        return $ [cfgFileArg, verbosityArg] ++ pdbArgs
     where
-      cfgFileArg = "--config-file=" ++ cfg
-      verbosityArg = "--verbose=" ++ showForCabal v
+      longArg s = showString "--" . showString s . ('=':)
+      cfgFileArg = longArg "config-file" cfg
+      verbosityArg = longArg "verbose" $ showForCabal v
+      withGhcPkg = longArg "with-ghc-pkg"
       getPdbArgs =
           case pdb of
+            -- Make Cabal call the wrapper that removes the bad
+            -- argument to ghc-pkg 6.8
+            --
+            -- XXX: If cabal-install is using a version of Cabal that
+            -- does not have this bug, it should not use the wrapper!
             (GHC_6_8_Db loc) -> do
-                     p <- findProgramLocation v "ghc-pkg-6.8-compat"
-                     case p of
-                       Nothing -> return []
-                       Just compat ->
-                           do absCompat <- canonicalizePath compat
-                              return $ [ "--ghc-pkg-options=--with-ghc-pkg=" ++ loc
-                                       , "--with-ghc-pkg=" ++ absCompat
-                                       ]
+                     (ghcPkgCompat, _) <-
+                         requireProgram v ghcPkgCompatProgram emptyProgramDb
+                     return $ [ longArg "ghc-pkg-options" $ withGhcPkg loc
+                              , withGhcPkg $ locationPath $
+                                programLocation ghcPkgCompat
+                              ]
             _ -> return []
+
+ghcPkgCompatProgram :: Program
+ghcPkgCompatProgram  = simpleProgram "ghc-pkg-6.8-compat"
 
 cabalProgram :: Program
 cabalProgram =
