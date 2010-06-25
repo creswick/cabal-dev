@@ -5,7 +5,6 @@ module Distribution.Dev.InitPkgDb
 where
 
 import Control.Monad ( unless )
-import qualified Distribution.Verbosity as V
 import Distribution.Simple.Program ( ghcPkgProgram, requireProgram
                                    , programVersion, ConfiguredProgram
                                    , programLocation, locationPath
@@ -13,23 +12,8 @@ import Distribution.Simple.Program ( ghcPkgProgram, requireProgram
 import Distribution.Version ( Version(..) )
 import Distribution.Verbosity ( Verbosity )
 
--- This makes MIN_VERSION_Cabal testing use the first option in the
--- absence of the macro (compilation without Cabal)
-#ifndef MIN_VERSION_Cabal
-#define MIN_VERSION_Cabal(a,b,c) 1
-#endif
-
--- Select the appropriate imports for the version of Cabal
-#if MIN_VERSION_Cabal(1,8,0)
 import Distribution.Simple.Program ( runProgram )
 import Distribution.Simple.Program.Db ( emptyProgramDb )
-#elif MIN_VERSION_Cabal(1,2,0)
-import Distribution.Simple.Program ( rawSystemProgram
-                                   , emptyProgramConfiguration )
-import Distribution.Version ( VersionRange(AnyVersion) )
-#else
-#error Cabal version not supported
-#endif
 
 import System.Directory ( doesFileExist, doesDirectoryExist )
 
@@ -48,15 +32,8 @@ import Distribution.Dev.Sandbox ( Sandbox, pkgConf, PackageDbType(..)
 -- cabal config file.
 initPkgDb :: Verbosity -> Sandbox UnknownVersion -> IO (Sandbox KnownVersion)
 initPkgDb v s = do
-#if MIN_VERSION_Cabal(1,8,0)
   let require p = requireProgram v p emptyProgramDb
       run     = runProgram
-#elif MIN_VERSION_Cabal(1,2,0)
-  let require p = requireProgram v p AnyVersion emptyProgramConfiguration
-      run     = rawSystemProgram
-#else
-#error Cabal version not supported
-#endif
 
   ghcPkg <- fst `fmap` require ghcPkgProgram
   let typ = ghcPackageDbType ghcPkg

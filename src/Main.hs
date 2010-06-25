@@ -18,11 +18,13 @@ import Distribution.Dev.Flags ( parseGlobalFlags, helpRequested, globalOpts
                               )
 import qualified Distribution.Dev.AddSource as AddSource
 import qualified Distribution.Dev.InvokeCabal as InvokeCabal
+import qualified Distribution.Dev.InstallDependencies as InstallDeps
 import Paths_cabal_dev ( version )
 
 allCommands :: [(String, CommandActions)]
 allCommands = [ ("add-source", AddSource.actions)
               , cabal "install"
+              , ("install-deps", InstallDeps.actions)
               , cabal "update"
               , cabal "list"
               , cabal "info"

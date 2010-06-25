@@ -1,26 +1,23 @@
 {-# LANGUAGE CPP #-}
 module Distribution.Dev.InvokeCabal
-    ( actions )
+    ( actions
+    , setup
+    , cabalProgram
+    )
 where
-
-#ifndef MIN_VERSION_Cabal
-#define MIN_VERSION_Cabal(a,b,c) 1
-#endif
 
 import Control.Arrow          ( left, right )
 import Distribution.Verbosity ( Verbosity, showForCabal )
-#if MIN_VERSION_Cabal(1,8,0)
-import Distribution.Simple.Program   ( findProgramLocation )
-#elif MIN_VERSION_Cabal(1,4,0)
-import Distribution.Simple.Program   ( findProgramOnPath )
-#else
-#error Cabal version unsupported
-#endif
-import Distribution.Simple.Utils ( notice )
+import Distribution.Simple.Program ( Program(programFindVersion)
+                                   , findProgramVersion
+                                   , simpleProgram
+                                   , findProgramLocation
+                                   , runProgram
+                                   , requireProgram
+                                   )
+import Distribution.Simple.Program.Db ( emptyProgramDb )
 import System.Console.GetOpt  ( OptDescr )
 import System.Directory       ( canonicalizePath )
-import System.Exit            ( ExitCode(..) )
-import System.Cmd             ( rawSystem )
 
 import Distribution.Dev.Command            ( CommandActions(..)
                                            , CommandResult(..)
@@ -36,14 +33,6 @@ import Distribution.Dev.Sandbox            ( resolveSandbox
                                            , getVersion
                                            )
 
-#if MIN_VERSION_Cabal(1,8,0)
-#elif MIN_VERSION_Cabal(1,4,0)
-findProgramLocation :: Verbosity -> FilePath -> IO (Maybe FilePath)
-findProgramLocation = flip findProgramOnPath
-#else
-#error Cabal version unsupported
-#endif
-
 actions :: String -> CommandActions
 actions act = CommandActions
               { cmdDesc = "Invoke cabal-install with the development configuration"
@@ -55,7 +44,12 @@ actions act = CommandActions
 invokeCabal :: [GlobalFlag] -> [String] -> IO CommandResult
 invokeCabal flgs args = do
   let v = getVerbosity flgs
-  either (return . CommandError) (invokeCabalCfg v . (++ args)) =<< setup flgs
+  res <- setup flgs
+  case res of
+    Left err -> return $ CommandError err
+    Right args' -> do
+             invokeCabalCfg v $ args' ++ args
+             return CommandOk
 
 setup :: [GlobalFlag] -> IO (Either String [String])
 setup flgs = do
@@ -92,11 +86,13 @@ extraArgs v cfg pdb =
                                        ]
             _ -> return []
 
-invokeCabalCfg :: Verbosity -> [String] -> IO CommandResult
+cabalProgram :: Program
+cabalProgram =
+    (simpleProgram "cabal") { programFindVersion =
+                                  findProgramVersion "--numeric-version" id
+                            }
+
+invokeCabalCfg :: Verbosity -> [String] -> IO ()
 invokeCabalCfg v args = do
-  notice v $ unwords $ "Invoking: cabal":args
-  res <- rawSystem "cabal" args
-  return $ case res of
-             ExitSuccess      -> CommandOk
-             ExitFailure code -> CommandError $
-                                 "cabal-install failed with " ++ show code
+  (cabal, _) <- requireProgram v cabalProgram emptyProgramDb
+  runProgram v cabal args

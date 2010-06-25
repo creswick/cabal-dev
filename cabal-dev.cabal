@@ -1,5 +1,5 @@
 Name:                cabal-dev
-Version:             0.2.1.1
+Version:             0.3
 Synopsis:            Manage sandboxed Haskell build environments
 
 Description:         cabal-dev is a tool for managing development builds of
@@ -40,7 +40,7 @@ Data-Files:
 
 Executable ghc-pkg-6.8-compat
   Main-is: GhcPkgCompat.hs
-  Build-Depends: Cabal >=1.4 && < 1.9
+  Build-Depends: Cabal >=1.8 && < 1.9
   GHC-Options: -Wall
   HS-Source-Dirs: src
 
@@ -60,7 +60,7 @@ Executable cabal-dev
     bytestring >= 0.9 && < 0.10,
     directory >= 1.0 && < 1.1,
     filepath >= 1.1 && < 1.2,
-    Cabal >= 1.4 && < 1.9,
+    Cabal >= 1.8 && < 1.9,
     HTTP == 4000.0.9,
     mtl >= 1.1 && < 1.2,
     network >= 2.2 && < 2.3,
@@ -75,5 +75,6 @@ Executable cabal-dev
     Distribution.Dev.Command,
     Distribution.Dev.Flags,
     Distribution.Dev.InvokeCabal,
+    Distribution.Dev.InstallDependencies,
     Distribution.Dev.RewriteCabalConfig,
     Distribution.Dev.InitPkgDb
