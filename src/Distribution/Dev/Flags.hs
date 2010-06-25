@@ -51,7 +51,13 @@ globalOpts = [ Option "h?" ["help"] (NoArg Help) "Show help text"
 parseGlobalFlags :: [String] -> ([GlobalFlag], [String], [String])
 parseGlobalFlags args =
     let (flgs, args', unknown, errs) = getOpt' Permute globalOpts args
-    in (flgs, args' ++ unknown, errs)
+        unusedArgs = args' ++ unknown
+        -- Attempt to get the arguments back into the order that they
+        -- were passed in, so for example, if there is an argument
+        -- --foo -o xxx -bar, we keep the xxx as a potential argument
+        -- to -o
+        unprocessed = [arg | arg <- args, arg `elem` unusedArgs]
+    in (flgs, unprocessed, errs)
 
 helpRequested :: [GlobalFlag] -> Bool
 helpRequested = (Help `elem`)
