@@ -8,13 +8,13 @@ import Data.Version ( showVersion )
 import Control.Monad ( unless )
 import System.Exit ( exitWith, ExitCode(..) )
 import System.Environment ( getArgs, getProgName )
-import System.Console.GetOpt ( usageInfo, getOpt, ArgOrder(Permute), getOpt' )
+import System.Console.GetOpt ( usageInfo, getOpt, ArgOrder(Permute) )
 import Distribution.Simple.Utils ( cabalVersion )
 import Distribution.Text ( display )
 
 import Distribution.Dev.Command ( CommandActions(..), CommandResult(..) )
 import Distribution.Dev.Flags ( parseGlobalFlags, helpRequested, globalOpts
-                              , GlobalFlag(Version)
+                              , GlobalFlag(Version), getOpt''
                               )
 import qualified Distribution.Dev.AddSource as AddSource
 import qualified Distribution.Dev.InvokeCabal as InvokeCabal
@@ -126,8 +126,7 @@ runCmd cmdAct flgs args
               (CommandActions _ r o passFlags) ->
                   let (cmdFlags, cmdArgs, cmdErrs) =
                           if passFlags
-                          then let (a, b, c, d) = getOpt' Permute o args
-                               in (a, b ++ c, d)
+                          then getOpt'' o args
                           else getOpt Permute o args
                   in if null cmdErrs
                      then r flgs cmdFlags cmdArgs

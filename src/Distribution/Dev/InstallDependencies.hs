@@ -18,7 +18,7 @@ actions = CommandActions
               { cmdDesc = "Install the dependencies for this package"
               , cmdRun = \flgs _ args -> installDependencies flgs args
               , cmdOpts = [] :: [OptDescr ()]
-              , cmdPassFlags = False
+              , cmdPassFlags = True
               }
 
 installDependencies :: [GlobalFlag] -> [String] -> IO CommandResult
@@ -30,8 +30,11 @@ installDependencies flgs pkgNames = do
     Right args ->
         do
           (cabal, _) <- requireProgram v cabalProgram emptyProgramDb
-          out <- getProgramOutput v cabal $
-                           args ++ ["install", "--dry-run", "--verbose=1"] ++ pkgNames
+          out <- getProgramOutput v cabal $ concat
+                 [ args
+                 , ["install", "--dry-run", "--verbose=1"]
+                 , pkgNames
+                 ]
           let -- Drop the lines that say:
               --  Resolving dependencies...
               --  In order, the following [...]

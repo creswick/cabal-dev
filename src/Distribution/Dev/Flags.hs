@@ -7,6 +7,7 @@ module Distribution.Dev.Flags
     , helpRequested
     , getCabalConfig
     , getVerbosity
+    , getOpt''
     )
 where
 
@@ -48,9 +49,9 @@ globalOpts = [ Option "h?" ["help"] (NoArg Help) "Show help text"
                "Show a machine-readable version number"
              ]
 
-parseGlobalFlags :: [String] -> ([GlobalFlag], [String], [String])
-parseGlobalFlags args =
-    let (flgs, args', unknown, errs) = getOpt' Permute globalOpts args
+getOpt'' :: [OptDescr a] -> [String] -> ([a], [String], [String])
+getOpt'' opts args =
+    let (flgs, args', unknown, errs) = getOpt' Permute opts args
         unusedArgs = args' ++ unknown
         -- Attempt to get the arguments back into the order that they
         -- were passed in, so for example, if there is an argument
@@ -58,6 +59,9 @@ parseGlobalFlags args =
         -- to -o
         unprocessed = [arg | arg <- args, arg `elem` unusedArgs]
     in (flgs, unprocessed, errs)
+
+parseGlobalFlags :: [String] -> ([GlobalFlag], [String], [String])
+parseGlobalFlags = getOpt'' globalOpts
 
 helpRequested :: [GlobalFlag] -> Bool
 helpRequested = (Help `elem`)
