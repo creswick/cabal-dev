@@ -227,10 +227,9 @@ processLocalSource :: V.Verbosity -> FilePath
 processLocalSource v fn =
     runErrorT $ do
       let cls = classifyLocalSource fn
-      liftIO $ print cls
       src <- case cls of
                Left u -> do
-                  liftIO $ putStrLn "Downloading"
+                  liftIO $ notice v $ "Downloading " ++ show u
                   TarPkg `fmap` eitherErrorIO (downloadTarball u)
                Right s -> return s
       (pkgId, c) <- eitherErrorIO $
