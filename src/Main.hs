@@ -23,19 +23,20 @@ import Paths_cabal_dev ( version )
 
 allCommands :: [(String, CommandActions)]
 allCommands = [ ("add-source", AddSource.actions)
-              , cabal "install"
               , ("install-deps", InstallDeps.actions)
-              , cabal "update"
-              , cabal "list"
-              , cabal "info"
-              , cabal "fetch"
-              , cabal "unpack"
-              , cabal "configure"
               , cabal "build"
-              , cabal "register"
               , cabal "clean"
+              , cabal "configure"
+              , cabal "copy"
+              , cabal "fetch"
               , cabal "haddock"
+              , cabal "info"
               , cabal "init"
+              , cabal "install"
+              , cabal "list"
+              , cabal "register"
+              , cabal "unpack"
+              , cabal "update"
               , cabal "hscolour"
               ]
     where
