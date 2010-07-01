@@ -38,7 +38,7 @@ Cabal-version:       >=1.2
 Data-Files:
   admin/cabal-config.in
 
-Executable ghc-pkg-6.8-compat
+Executable ghc-pkg-6_8-compat
   Main-is: GhcPkgCompat.hs
   Build-Depends: Cabal >=1.8 && < 1.9
   GHC-Options: -Wall

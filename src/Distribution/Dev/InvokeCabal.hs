@@ -92,7 +92,7 @@ extraArgs v cfg pdb =
             _ -> return []
 
 ghcPkgCompatProgram :: Program
-ghcPkgCompatProgram  = simpleProgram "ghc-pkg-6.8-compat"
+ghcPkgCompatProgram  = simpleProgram "ghc-pkg-6_8-compat"
 
 cabalProgram :: Program
 cabalProgram =
