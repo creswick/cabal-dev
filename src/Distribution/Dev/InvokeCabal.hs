@@ -8,7 +8,9 @@ where
 
 import Control.Arrow          ( left, right )
 import Distribution.Verbosity ( Verbosity, showForCabal )
-import Distribution.Simple.Program ( Program(programFindVersion)
+import Distribution.Simple.Program ( Program( programFindVersion
+                                            , programFindLocation
+                                            )
                                    , findProgramVersion
                                    , simpleProgram
                                    , runProgram
@@ -32,7 +34,7 @@ import Distribution.Dev.Sandbox            ( resolveSandbox
                                            , PackageDbType(..)
                                            , getVersion
                                            )
-
+import System.Directory ( canonicalizePath )
 actions :: String -> CommandActions
 actions act = CommandActions
               { cmdDesc = "Invoke cabal-install with the development configuration"
@@ -92,7 +94,15 @@ extraArgs v cfg pdb =
             _ -> return []
 
 ghcPkgCompatProgram :: Program
-ghcPkgCompatProgram  = simpleProgram "ghc-pkg-6_8-compat"
+ghcPkgCompatProgram  = p { programFindLocation =
+                           \v -> do
+                             res <- programFindLocation p v
+                             case res of
+                               Nothing -> return Nothing
+                               Just loc -> Just `fmap` canonicalizePath loc
+                         }
+    where
+      p = simpleProgram "ghc-pkg-6_8-compat"
 
 cabalProgram :: Program
 cabalProgram =
