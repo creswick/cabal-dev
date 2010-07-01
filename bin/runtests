@@ -90,6 +90,9 @@ checkExitSuccess --version
 checkExitSuccess --numeric-version
 checkExitSuccess --help
 
+# Add the new binaries to the path
+PATH="${SANDBOX}/bin:$PATH"
+
 # Make an sdist for the current source tree and put it in the index
 # for the sandbox repo
 "${SANDBOX}/bin/cabal-dev" add-source .
