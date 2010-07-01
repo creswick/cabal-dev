@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-SANDBOX=cabal-dev
+SANDBOX=$(pwd)/cabal-dev
 
 # We can't use the cabal-dev code until we know that we have the
 # dependencies installed, and we need this bootstrapping done to
