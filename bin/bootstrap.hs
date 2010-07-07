@@ -12,7 +12,8 @@ import qualified Distribution.Dev.RewriteCabalConfig as R
 import Data.List ( isPrefixOf )
 import Control.Monad ( unless )
 import Distribution.Simple.Utils ( rawSystemExit, rawSystemStdout )
-import Distribution.Verbosity ( Verbosity, normal, verbose, showForCabal )
+import Distribution.Verbosity ( Verbosity, normal, verbose, showForCabal
+                              , deafening )
 import System.Directory ( getHomeDirectory, canonicalizePath, doesFileExist
                         , doesDirectoryExist, getCurrentDirectory
                         , createDirectoryIfMissing )
@@ -37,6 +38,7 @@ main = do
              [] -> normal
              ["-v"] -> verbose
              ["--verbose"] -> verbose
+             ["--verbose=3"] -> deafening
              _ -> error $ "Unrecognized arguments: " ++ show args
 
   -- Create a sandbox to hold the installation
