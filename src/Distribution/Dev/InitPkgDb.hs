@@ -4,6 +4,7 @@ module Distribution.Dev.InitPkgDb
     )
 where
 
+
 import Control.Monad ( unless )
 import Distribution.Simple.Program ( ghcPkgProgram, requireProgram
                                    , programVersion, ConfiguredProgram
@@ -12,8 +13,7 @@ import Distribution.Simple.Program ( ghcPkgProgram, requireProgram
 import Distribution.Version ( Version(..) )
 import Distribution.Verbosity ( Verbosity )
 
-import Distribution.Simple.Program ( runProgram )
-import Distribution.Simple.Program.Db ( emptyProgramDb )
+import Distribution.Simple.Program ( rawSystemProgram, emptyProgramConfiguration )
 
 import System.Directory ( doesFileExist, doesDirectoryExist )
 
@@ -32,8 +32,8 @@ import Distribution.Dev.Sandbox ( Sandbox, pkgConf, PackageDbType(..)
 -- cabal config file.
 initPkgDb :: Verbosity -> Sandbox UnknownVersion -> IO (Sandbox KnownVersion)
 initPkgDb v s = do
-  let require p = requireProgram v p emptyProgramDb
-      run     = runProgram
+  let require p = requireProgram v p emptyProgramConfiguration
+      run     = rawSystemProgram
 
   ghcPkg <- fst `fmap` require ghcPkgProgram
   let typ = ghcPackageDbType ghcPkg

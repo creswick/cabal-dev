@@ -67,7 +67,7 @@ import qualified Distribution.Verbosity  as V
 import Distribution.Dev.Command ( CommandActions(..), CommandResult(..) )
 import Distribution.Dev.Flags   ( GlobalFlag, getVerbosity )
 import Distribution.Dev.Sandbox ( resolveSandbox, localRepoPath
-                                , Sandbox
+                                , Sandbox, indexTar, indexTarBase
                                 )
 
 import Distribution.Simple.Utils ( debug, notice )
@@ -300,7 +300,12 @@ processDirectory v d = go `catch` \e ->
                          forcedBS <=< L.hGetContents
             return $ Right (pkgId, cabalFile)
           else
-            return $ Left $ "Package name does not match cabal file name: " ++ fn
+            return $ Left $ unlines $
+                       [ "Package name does not match cabal file name:"
+                       , " filename = " ++ fn
+                       , " package name 1 = " ++ show (mkPackageName (takeBaseName c))
+                       , " package name 2 = " ++ show (pkgName pkgId)
+                       ]
 
 -- |Force a lazy ByteString to be read
 forceBS :: L.ByteString -> IO ()
@@ -353,10 +358,3 @@ tarballName pkgId = repoDir pkgId </> (display pkgId <.> "tar" <.> "gz")
 repoDir :: PackageIdentifier -> FilePath
 repoDir pkgId = displayPackageName (pkgName pkgId) </>
                 display (pkgVersion pkgId)
-
--- |The name of the cabal-install package index
-indexTarBase :: FilePath
-indexTarBase = "00-index.tar"
-
-indexTar :: Sandbox a -> FilePath
-indexTar sandbox = localRepoPath sandbox </> indexTarBase

@@ -1,25 +1,35 @@
 {-# LANGUAGE GADTs, EmptyDataDecls #-}
 module Distribution.Dev.Sandbox
-    ( defaultSandbox
-    , resolveSandbox
-    , getSandbox
-    , Sandbox
-    , localRepoPath
-    , pkgConf
-    , cabalConf
+    ( KnownVersion
     , PackageDbType(..)
-    , setVersion
-    , getVersion
+    , Sandbox
     , UnknownVersion
-    , KnownVersion
+    , cabalConf
+    , defaultSandbox
+    , getSandbox
+    , getVersion
+    , indexTar
+    , indexTarBase
+    , localRepoPath
+    , newSandbox
+    , pkgConf
+    , resolveSandbox
+    , sandbox
+    , setVersion
     )
 where
 
-import Data.Maybe ( listToMaybe )
-import qualified Distribution.Dev.Flags as F ( GlobalFlag(Sandbox), getVerbosity )
+import Control.Monad             ( unless )
+import Data.Maybe                ( listToMaybe )
 import Distribution.Simple.Utils ( debug )
-import System.Directory ( canonicalizePath, createDirectoryIfMissing )
-import System.FilePath ( (</>) )
+import Distribution.Verbosity    ( Verbosity )
+import System.Directory          ( canonicalizePath, createDirectoryIfMissing
+                                 , doesFileExist, copyFile )
+import System.FilePath           ( (</>) )
+
+import qualified Distribution.Dev.Flags as F ( GlobalFlag(Sandbox), getVerbosity )
+
+import Paths_cabal_dev ( getDataFileName )
 
 -- A sandbox directory that we may or may not know what kind of
 -- package format it uses
@@ -67,18 +77,34 @@ defaultSandbox = "./cabal-dev"
 getSandbox :: [F.GlobalFlag] -> Maybe FilePath
 getSandbox flgs = listToMaybe [ fn | F.Sandbox fn <- flgs ]
 
+newSandbox :: Verbosity -> FilePath -> IO (Sandbox UnknownVersion)
+newSandbox v relSandboxDir = do
+  sandboxDir <- canonicalizePath relSandboxDir
+  debug v $ "Using " ++ sandboxDir ++ " as the cabal-dev sandbox"
+  createDirectoryIfMissing True sandboxDir
+  let sb = UnknownVersion sandboxDir
+  createDirectoryIfMissing True $ localRepoPath sb
+  extant <- doesFileExist (indexTar sb)
+  unless extant $ do
+    emptyIdxFile <- getDataFileName $ "admin" </> indexTarBase
+    copyFile emptyIdxFile (indexTar sb)
+  return sb
+
 resolveSandbox :: [F.GlobalFlag] -> IO (Sandbox UnknownVersion)
 resolveSandbox flgs = do
+  let v = F.getVerbosity flgs
   relSandbox <-
       case getSandbox flgs of
         Nothing -> do
-          debug (F.getVerbosity flgs) $
-                    "No local repository specified. Using " ++ defaultSandbox
+          debug v $ "No sandbox specified. Using " ++ defaultSandbox
           return defaultSandbox
         Just s -> return $ s
 
-  localRepo <- canonicalizePath relSandbox
-  debug (F.getVerbosity flgs) $
-            "Using " ++ localRepo ++ " as the local repository path"
-  createDirectoryIfMissing True localRepo
-  return $ UnknownVersion localRepo
+  newSandbox v relSandbox
+
+-- |The name of the cabal-install package index
+indexTarBase :: FilePath
+indexTarBase = "00-index.tar"
+
+indexTar :: Sandbox a -> FilePath
+indexTar sb = localRepoPath sb </> indexTarBase

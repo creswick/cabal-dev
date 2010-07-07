@@ -8,42 +8,40 @@ relative to the current path, supporting limited tilde expansion
 -}
 module Distribution.Dev.RewriteCabalConfig
     ( rewriteCabalConfig
+    , Rewrite(..)
     )
 where
 
 import Data.Maybe                ( fromMaybe )
 import Control.Monad             ( liftM )
-import Distribution.Simple.Utils ( withUTF8FileContents, writeUTF8File )
 import Distribution.ParseUtils   ( readFields, ParseResult(..), Field(..) )
-import System.Directory          ( canonicalizePath, getHomeDirectory )
-import Distribution.Dev.Sandbox  ( Sandbox, KnownVersion, pkgConf )
+import System.Directory          ( canonicalizePath )
 import Text.PrettyPrint.HughesPJ
+
+data Rewrite = Rewrite { homeDir :: FilePath
+                       , sandboxDir :: FilePath
+                       , packageDb :: FilePath
+                       }
 
 -- |Rewrite a cabal-install config file so that all paths are made
 -- absolute and canonical.
-rewriteCabalConfig :: FilePath -- ^The input config file
-                   -> FilePath -- ^The output config file
-                   -> Sandbox KnownVersion
-                   -> IO (Either String ())
-rewriteCabalConfig cfgIn cfgOut s = do
-  home <- getHomeDirectory
-  rewriteConfig (expandCabalConfig home) (setPackageDb s) cfgIn cfgOut
+rewriteCabalConfig :: Rewrite -> String -> IO (Either String String)
+rewriteCabalConfig r =
+    rewriteConfig (expandCabalConfig (homeDir r) (sandboxDir r))
+                      (setPackageDb $ packageDb r)
 
 -- |Given an expansion configuration, read the input config file and
 -- write the expansion into the output config file
-rewriteConfig :: Expand IO -> ([Field] -> [Field])
-              -> FilePath -> FilePath -> IO (Either String ())
-rewriteConfig expand proc srcConfig destConfig =
-    withUTF8FileContents srcConfig $ \s ->
+rewriteConfig :: Expand IO -> ([Field] -> [Field]) -> String
+              -> IO (Either String String)
+rewriteConfig expand proc s =
         case readFields s of
           ParseFailed err -> return $ Left $ show err
           ParseOk _ fs    ->
-              fmap Right $
-              writeUTF8File destConfig . show . ppTopLevel . proc =<<
-              rewriteTopLevel expand fs
+              (Right . show . ppTopLevel . proc) `fmap` rewriteTopLevel expand fs
 
-setPackageDb :: Sandbox KnownVersion -> [Field] -> [Field]
-setPackageDb s = (F 0 "package-db" (pkgConf s):) . filter (not . isPackageDb)
+setPackageDb :: FilePath -> [Field] -> [Field]
+setPackageDb pkgDb = (F 0 "package-db" pkgDb:) . filter (not . isPackageDb)
     where
       isPackageDb (F _ "package-db" _) = True
       isPackageDb _                  = False
@@ -94,6 +92,12 @@ expandTilde home s = case break (== '/') s of
                        ("~", rest) -> home ++ rest
                        _           -> s
 
+-- |Replace a tilde as an initial path segment with a path.
+expandDot :: FilePath -> String -> String
+expandDot sandbox s = case break (== '/') s of
+                        (".", rest) -> sandbox ++ rest
+                        _           -> s
+
 -- |Identity expansion
 don'tExpand :: Monad m => Expand m
 don'tExpand = Expand return [] []
@@ -107,8 +111,8 @@ don'tExpand = Expand return [] []
 --
 -- If the cabal-install config file changes, or if this list is not
 -- complete, this code will have to be updated.
-expandCabalConfig :: FilePath -> Expand IO
-expandCabalConfig home =
+expandCabalConfig :: FilePath -> FilePath -> Expand IO
+expandCabalConfig home sandbox =
     Expand { eExpand = ePath
            , eLeaves = [ "remote-repo-cache"
                        , "local-repo"
@@ -144,4 +148,4 @@ expandCabalConfig home =
                  , eSections = []
                  }
 
-      ePath = canonicalizePath . expandTilde home
+      ePath = canonicalizePath . expandDot sandbox . expandTilde home

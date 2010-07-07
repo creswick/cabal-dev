@@ -2,11 +2,11 @@
 module Distribution.Dev.InvokeCabal
     ( actions
     , setup
+    , extraArgs
     , cabalProgram
     )
 where
 
-import Control.Arrow          ( left, right )
 import Distribution.Verbosity ( Verbosity, showForCabal )
 import Distribution.Simple.Program ( Program( programFindVersion
                                             , programFindLocation
@@ -17,8 +17,9 @@ import Distribution.Simple.Program ( Program( programFindVersion
                                    , requireProgram
                                    , programLocation
                                    , locationPath
+                                   , emptyProgramConfiguration
                                    )
-import Distribution.Simple.Program.Db ( emptyProgramDb )
+import Distribution.Simple.Utils ( withUTF8FileContents, writeUTF8File )
 import System.Console.GetOpt  ( OptDescr )
 
 import Distribution.Dev.Command            ( CommandActions(..)
@@ -28,13 +29,17 @@ import Distribution.Dev.Flags              ( GlobalFlag, getCabalConfig
                                            , getVerbosity
                                            )
 import Distribution.Dev.InitPkgDb          ( initPkgDb )
-import Distribution.Dev.RewriteCabalConfig ( rewriteCabalConfig )
+import qualified Distribution.Dev.RewriteCabalConfig as R
 import Distribution.Dev.Sandbox            ( resolveSandbox
                                            , cabalConf
+                                           , Sandbox
+                                           , KnownVersion
                                            , PackageDbType(..)
                                            , getVersion
+                                           , pkgConf
+                                           , sandbox
                                            )
-import System.Directory ( canonicalizePath )
+import System.Directory ( canonicalizePath, getHomeDirectory )
 actions :: String -> CommandActions
 actions act = CommandActions
               { cmdDesc = "Invoke cabal-install with the development configuration"
@@ -46,27 +51,29 @@ actions act = CommandActions
 invokeCabal :: [GlobalFlag] -> [String] -> IO CommandResult
 invokeCabal flgs args = do
   let v = getVerbosity flgs
-  res <- setup flgs
+  s <- initPkgDb v =<< resolveSandbox flgs
+  res <- setup s flgs
   case res of
     Left err -> return $ CommandError err
     Right args' -> do
              invokeCabalCfg v $ args' ++ args
              return CommandOk
 
-setup :: [GlobalFlag] -> IO (Either String [String])
-setup flgs = do
+setup :: Sandbox KnownVersion-> [GlobalFlag] -> IO (Either String [String])
+setup s flgs = do
   let v = getVerbosity flgs
-  s <- initPkgDb v =<< resolveSandbox flgs
   cfgIn <- getCabalConfig flgs
   let cfgOut = cabalConf s
-  cfgRes <- rewriteCabalConfig cfgIn cfgOut s
-  let qualifyError err =
-          "Error processing cabal config file " ++ cfgIn ++ ": " ++ err
-  args <- extraArgs v cfgOut (getVersion s)
-  return $
-         left qualifyError $
-         right (const $ args) $
-         cfgRes
+  home <- getHomeDirectory
+  withUTF8FileContents cfgIn $ \cIn ->
+      do cfgRes <- R.rewriteCabalConfig (R.Rewrite home (sandbox s) (pkgConf s)) cIn
+         case cfgRes of
+           Left err -> return $ Left $
+                       "Error processing cabal config file " ++ cfgIn ++ ": " ++ err
+           Right cOut -> do
+                       writeUTF8File cfgOut cOut
+                       args <- extraArgs v cfgOut (getVersion s)
+                       return $ Right args
 
 extraArgs :: Verbosity -> FilePath -> PackageDbType -> IO [String]
 extraArgs v cfg pdb =
@@ -86,7 +93,7 @@ extraArgs v cfg pdb =
             -- does not have this bug, it should not use the wrapper!
             (GHC_6_8_Db loc) -> do
                      (ghcPkgCompat, _) <-
-                         requireProgram v ghcPkgCompatProgram emptyProgramDb
+                         requireProgram v ghcPkgCompatProgram emptyProgramConfiguration
                      return $ [ longArg "ghc-pkg-options" $ withGhcPkg loc
                               , withGhcPkg $ locationPath $
                                 programLocation ghcPkgCompat
@@ -112,5 +119,5 @@ cabalProgram =
 
 invokeCabalCfg :: Verbosity -> [String] -> IO ()
 invokeCabalCfg v args = do
-  (cabal, _) <- requireProgram v cabalProgram emptyProgramDb
+  (cabal, _) <- requireProgram v cabalProgram emptyProgramConfiguration
   runProgram v cabal args

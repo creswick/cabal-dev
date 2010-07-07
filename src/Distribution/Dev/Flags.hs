@@ -11,17 +11,9 @@ module Distribution.Dev.Flags
     )
 where
 
-#ifndef MIN_VERSION_Cabal
-#define MIN_VERSION_Cabal(a,b,c) 1
-#endif
-
 import Data.Maybe             ( listToMaybe )
-#if MIN_VERSION_Cabal(1,4,0)
+import System.FilePath        ( (</>) )
 import Distribution.ReadE     ( runReadE )
-#elif MIN_VERSION_Cabal(1,2,0)
-#else
-#error Unsupported cabal version
-#endif
 import Distribution.Verbosity ( Verbosity, normal, flagToVerbosity )
 import Paths_cabal_dev        ( getDataFileName )
 import System.Console.GetOpt  ( OptDescr(..), ArgOrder(..), ArgDescr(..)
@@ -70,17 +62,12 @@ cabalConfigFlag :: [GlobalFlag] -> Maybe FilePath
 cabalConfigFlag flgs = listToMaybe [p | CabalConf p <- flgs]
 
 getCabalConfig :: [GlobalFlag] -> IO FilePath
-getCabalConfig = maybe (getDataFileName "admin/cabal-config.in") return .
-                 cabalConfigFlag
+getCabalConfig = maybe defaultFileName return . cabalConfigFlag
+    where
+      defaultFileName = getDataFileName $ "admin" </> "cabal-config.in"
 
 getVerbosity :: [GlobalFlag] -> Verbosity
-#if MIN_VERSION_Cabal(1,4,0)
 getVerbosity flgs =
     case map (runReadE flagToVerbosity) [ s | Verbose s <- flgs ] of
       (Right v:_) -> v
       _           -> normal
-#elif MIN_VERSION_Cabal(1,2,0)
-getVerbosity flgs = flagToVerbosity $ listToMaybe [ s | Verbose s <- flgs ]
-#else
-#error Unsupported cabal version
-#endif

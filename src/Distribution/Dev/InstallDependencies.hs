@@ -5,6 +5,8 @@ where
 import System.Console.GetOpt ( OptDescr(..) )
 import Distribution.Dev.Command ( CommandActions(..), CommandResult(..) )
 import Distribution.Dev.Flags ( GlobalFlag, getVerbosity )
+import Distribution.Dev.Sandbox ( resolveSandbox )
+import Distribution.Dev.InitPkgDb ( initPkgDb )
 import Distribution.Dev.InvokeCabal ( setup, cabalProgram )
 import Distribution.Simple.Program ( requireProgram
                                    , getProgramOutput
@@ -24,7 +26,8 @@ actions = CommandActions
 installDependencies :: [GlobalFlag] -> [String] -> IO CommandResult
 installDependencies flgs pkgNames = do
   let v = getVerbosity flgs
-  setupRes <- setup flgs
+  s <- initPkgDb v =<< resolveSandbox flgs
+  setupRes <- setup s flgs
   case setupRes of
     Left err -> return $ CommandError err
     Right args ->
