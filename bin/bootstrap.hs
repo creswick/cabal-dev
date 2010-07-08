@@ -62,7 +62,8 @@ main = do
                              , "--verbose=" ++ showForCabal vb
                              ]
   let bin = (sandbox </>) . ("bin" </>)
-  rawSystemExit vb (bin "cabal-dev-test") [bin "cabal-dev"]
+  rawSystemExit vb (bin "cabal-dev-test")
+                    [bin "cabal-dev", "--plain", "--jxml=test-results.xml"]
 
 -- The absolute path to the sandbox directory
 getSandbox :: IO FilePath
@@ -178,4 +179,3 @@ createCabalConfig sandbox ghcPkgDb = do
       =<< R.rewriteCabalConfig (R.Rewrite home sandbox ghcPkgDb)
       =<< readFile cfgIn
   return cfgOut
-
