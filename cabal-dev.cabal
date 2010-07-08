@@ -1,5 +1,5 @@
 Name:                cabal-dev
-Version:             0.3.4.0
+Version:             0.3.4.1
 Synopsis:            Manage sandboxed Haskell build environments
 
 Description:         cabal-dev is a tool for managing development builds of
@@ -36,7 +36,8 @@ Category:            Development
 Build-type:          Simple
 Cabal-version:       >=1.2
 Data-Files:
-  admin/cabal-config.in
+  admin/cabal-config.in,
+  admin/00-index.tar
 
 Flag no-cabal-dev
   Description: Do not build cabal-dev (just build ghc-pkg-6_8-compat).
