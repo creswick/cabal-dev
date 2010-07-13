@@ -39,7 +39,7 @@ import Distribution.Dev.Sandbox            ( resolveSandbox
                                            , pkgConf
                                            , sandbox
                                            )
-import System.Directory ( canonicalizePath, getHomeDirectory )
+import System.Directory ( canonicalizePath, getAppUserDataDirectory )
 actions :: String -> CommandActions
 actions act = CommandActions
               { cmdDesc = "Invoke cabal-install with the development configuration"
@@ -64,9 +64,10 @@ setup s flgs = do
   let v = getVerbosity flgs
   cfgIn <- getCabalConfig flgs
   let cfgOut = cabalConf s
-  home <- getHomeDirectory
+--  home <- getHomeDirectory
+  cabalHome <- getAppUserDataDirectory "cabal"
   withUTF8FileContents cfgIn $ \cIn ->
-      do cfgRes <- R.rewriteCabalConfig (R.Rewrite home (sandbox s) (pkgConf s)) cIn
+      do cfgRes <- R.rewriteCabalConfig (R.Rewrite cabalHome (sandbox s) (pkgConf s)) cIn
          case cfgRes of
            Left err -> return $ Left $
                        "Error processing cabal config file " ++ cfgIn ++ ": " ++ err
