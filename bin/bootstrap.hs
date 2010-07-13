@@ -14,7 +14,7 @@ import Control.Monad ( unless )
 import Distribution.Simple.Utils ( rawSystemExit, rawSystemStdout )
 import Distribution.Verbosity ( Verbosity, normal, verbose, showForCabal
                               , deafening )
-import System.Directory ( getHomeDirectory, canonicalizePath, doesFileExist
+import System.Directory ( getAppUserDataDirectory, canonicalizePath, doesFileExist
                         , doesDirectoryExist, getCurrentDirectory
                         , createDirectoryIfMissing )
 import System.FilePath ( (</>) )
@@ -174,8 +174,8 @@ createCabalConfig :: FilePath -> FilePath -> IO FilePath
 createCabalConfig sandbox ghcPkgDb = do
   let cfgIn = "admin" </> "cabal-config.in"
   let cfgOut = sandbox </> "cabal.config"
-  home <- getHomeDirectory
+  cabalHome <- getAppUserDataDirectory "cabal"
   either fail (writeFile cfgOut)
-      =<< R.rewriteCabalConfig (R.Rewrite home sandbox ghcPkgDb)
+      =<< R.rewriteCabalConfig (R.Rewrite cabalHome sandbox ghcPkgDb)
       =<< readFile cfgIn
   return cfgOut
