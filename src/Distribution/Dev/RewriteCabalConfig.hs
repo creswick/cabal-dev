@@ -5,6 +5,9 @@ Rewrite the paths of a cabal-install config file, canonicalizing them
 relative to the current path, supporting limited tilde expansion
 (tilde expansion for the current user only)
 
+This module is written so that it will work out-of-the-box with GHC >=
+6.8 && < 6.13 with no other packages installed.
+
 -}
 module Distribution.Dev.RewriteCabalConfig
     ( rewriteCabalConfig

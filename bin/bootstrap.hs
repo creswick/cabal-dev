@@ -9,37 +9,69 @@
 -- @
 import qualified Distribution.Dev.RewriteCabalConfig as R
 
+import Control.Applicative ( (<$>) )
 import Data.List ( isPrefixOf )
-import Control.Monad ( unless )
+import Control.Monad ( unless, (<=<) )
 import Distribution.Simple.Utils ( rawSystemExit, rawSystemStdout )
 import Distribution.Verbosity ( Verbosity, normal, verbose, showForCabal
-                              , deafening )
+                              , deafening, intToVerbosity )
 import System.Directory ( getAppUserDataDirectory, canonicalizePath, doesFileExist
                         , doesDirectoryExist, getCurrentDirectory
                         , createDirectoryIfMissing )
 import System.FilePath ( (</>) )
 import System.Environment ( getArgs )
+import System.Console.GetOpt  ( OptDescr(..), ArgOrder(..), ArgDescr(..)
+                              , getOpt
+                              )
 
 -- We would use cabal-dev itself here, but we use something a little
 -- more brittle in order to make this code work with the Cabal that
 -- came with GHC >= 6.8 so that we can bootstrap an installation
 -- environment without installing any dependencies in a location that
--- could pollute other builds. RewriteCabalConfig is carefully written
--- so that it will work out-of-the-box with GHC >= 6.8 && < 6.13
+-- could pollute other builds.
 
 -- TODO:
 --  * Attempt to use cabal-dev if it's present at the start
---  * Invoke the test executable
+
+data Flag = Verbose (Maybe String)
+
+opts :: [OptDescr Flag]
+opts = [ Option "v" ["verbose"] (OptArg Verbose "LEVEL")
+         "Specify verbosity level"
+       ]
+
+-- This function is in base 4 but not base 3
+partitionEithers :: [Either a b] -> ([a], [b])
+partitionEithers = go id id
+    where
+      go ls rs es = case es of
+                      []            -> (ls [], rs [])
+                      (Left x:es')  -> go (ls . (x:)) rs es'
+                      (Right x:es') -> go ls (rs . (x:)) es'
+
+maybeReads :: Read a => String -> Maybe a
+maybeReads s = case reads s of
+                 [(i, [])] -> Just i
+                 _         -> Nothing
+
+parseArgs :: [String] -> Either String Verbosity
+parseArgs args =
+    case getOpt Permute opts args of
+      (vs, [] , []) -> case partitionEithers $ map toVerbosity vs of
+                         ([], vs') -> Right $ last (normal:vs')
+                         (es, _  ) -> Left $ unlines es
+      (_, args, []) -> Left "This program takes no arguments"
+      (_, _   , es) -> Left $ unlines es
+    where
+      toVerbosity (Verbose Nothing) = Right verbose
+      toVerbosity (Verbose (Just s)) = maybe badSpec Right $ readV s
+          where
+            badSpec = Left $ "Bad verbosity specification: " ++ show s
+      readV = intToVerbosity <=< maybeReads
 
 main :: IO ()
 main = do
-  args <- getArgs
-  let vb = case args of
-             [] -> normal
-             ["-v"] -> verbose
-             ["--verbose"] -> verbose
-             ["--verbose=3"] -> deafening
-             _ -> error $ "Unrecognized arguments: " ++ show args
+  vb <- either fail return . parseArgs =<< getArgs
 
   -- Create a sandbox to hold the installation
   sandbox <- getSandbox
