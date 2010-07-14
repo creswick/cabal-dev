@@ -35,62 +35,6 @@ import System.Console.GetOpt  ( OptDescr(..), ArgOrder(..), ArgDescr(..)
 -- TODO:
 --  * Attempt to use cabal-dev if it's present at the start
 
-data Flag = Verbose (Maybe String) | RunTests
-
-opts :: [OptDescr Flag]
-opts = [ Option "v" ["verbose"] (OptArg Verbose "LEVEL")
-         "Specify verbosity level"
-       , Option "" ["run-tests"] (NoArg RunTests)
-         "Run the test suite after bootstrapping"
-       ]
-
--- This function is in base 4 but not base 3
-partitionEithers :: [Either a b] -> ([a], [b])
-partitionEithers = go id id
-    where
-      go ls rs es = case es of
-                      []            -> (ls [], rs [])
-                      (Left x:es')  -> go (ls . (x:)) rs es'
-                      (Right x:es') -> go ls (rs . (x:)) es'
-
-maybeReads :: Read a => String -> Maybe a
-maybeReads s = case reads s of
-                 [(i, [])] -> Just i
-                 _         -> Nothing
-
-parseArgs :: [String] -> Either String Config
-parseArgs args =
-    case getOpt Permute opts args of
-      (flgs, [] , []) -> case partitionEithers $ map toConfig flgs of
-                           ([], cfgs) -> Right $ mconcat cfgs
-                           (es, _  ) -> Left $ unlines es
-      (_, args, []) -> Left "This program takes no arguments"
-      (_, _   , es) -> Left $ unlines es
-    where
-
-data Config = Config { cfgVerbosity :: Maybe Verbosity
-                     , cfgRunTests :: Bool
-                     }
-
-instance Monoid Config where
-    mempty = Config Nothing False
-    mappend (Config v1 r1) (Config v2 r2) = Config (v2 `mplus` v1) (r1 || r2)
-
-getVerbosity :: Config -> Verbosity
-getVerbosity = fromMaybe normal . cfgVerbosity
-
-toConfig :: Flag -> Either String Config
-toConfig (Verbose arg) =
-    case arg of
-      Nothing -> ok verbose
-      Just s  -> maybe badSpec ok $ readV s
-          where
-            badSpec = Left $ "Bad verbosity specification: " ++ show s
-    where
-      ok v = Right mempty { cfgVerbosity = Just v }
-      readV = intToVerbosity <=< maybeReads
-toConfig RunTests = Right mempty { cfgRunTests = True }
-
 main :: IO ()
 main = do
   cfg <- either fail return . parseArgs =<< getArgs
@@ -119,7 +63,7 @@ main = do
   let bin = (sandbox </>) . ("bin" </>)
   when (cfgRunTests cfg) $
        rawSystemExit vb (bin "cabal-dev-test")
-                         [bin "cabal-dev", "--plain", "--jxml=test-results.xml"]
+       [bin "cabal-dev", "--plain", "--jxml=test-results.xml"]
 
 -- The absolute path to the sandbox directory
 getSandbox :: IO FilePath
@@ -235,3 +179,62 @@ createCabalConfig sandbox ghcPkgDb = do
       =<< R.rewriteCabalConfig (R.Rewrite cabalHome sandbox ghcPkgDb)
       =<< readFile cfgIn
   return cfgOut
+
+--------------------------------------------------
+-- Argument processing
+
+parseArgs :: [String] -> Either String Config
+parseArgs args =
+    case getOpt Permute opts args of
+      (flgs, [] , []) -> case partitionEithers $ map toConfig flgs of
+                           ([], cfgs) -> Right $ mconcat cfgs
+                           (es, _  ) -> Left $ unlines es
+      (_, args, []) -> Left "This program takes no arguments"
+      (_, _   , es) -> Left $ unlines es
+    where
+
+data Config = Config { cfgVerbosity :: Maybe Verbosity
+                     , cfgRunTests :: Bool
+                     }
+
+instance Monoid Config where
+    mempty = Config Nothing False
+    mappend (Config v1 r1) (Config v2 r2) = Config (v2 `mplus` v1) (r1 || r2)
+
+getVerbosity :: Config -> Verbosity
+getVerbosity = fromMaybe normal . cfgVerbosity
+
+data Flag = Verbose (Maybe String) | RunTests
+
+opts :: [OptDescr Flag]
+opts = [ Option "v" ["verbose"] (OptArg Verbose "LEVEL")
+         "Specify verbosity level"
+       , Option "" ["run-tests"] (NoArg RunTests)
+         "Run the test suite after bootstrapping"
+       ]
+
+-- This function is in base 4 but not base 3
+partitionEithers :: [Either a b] -> ([a], [b])
+partitionEithers = go id id
+    where
+      go ls rs es = case es of
+                      []            -> (ls [], rs [])
+                      (Left x:es')  -> go (ls . (x:)) rs es'
+                      (Right x:es') -> go ls (rs . (x:)) es'
+
+maybeReads :: Read a => String -> Maybe a
+maybeReads s = case reads s of
+                 [(i, [])] -> Just i
+                 _         -> Nothing
+
+toConfig :: Flag -> Either String Config
+toConfig (Verbose arg) =
+    case arg of
+      Nothing -> ok verbose
+      Just s  -> maybe badSpec ok $ readV s
+          where
+            badSpec = Left $ "Bad verbosity specification: " ++ show s
+    where
+      ok v = Right mempty { cfgVerbosity = Just v }
+      readV = intToVerbosity <=< maybeReads
+toConfig RunTests = Right mempty { cfgRunTests = True }

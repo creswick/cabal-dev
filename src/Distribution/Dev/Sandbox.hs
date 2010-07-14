@@ -83,6 +83,7 @@ newSandbox v relSandboxDir = do
   debug v $ "Using " ++ sandboxDir ++ " as the cabal-dev sandbox"
   createDirectoryIfMissing True sandboxDir
   let sb = UnknownVersion sandboxDir
+  debug v $ "Creating local repo " ++ localRepoPath sb
   createDirectoryIfMissing True $ localRepoPath sb
   extant <- doesFileExist (indexTar sb)
   unless extant $ do
