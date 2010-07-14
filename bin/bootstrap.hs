@@ -11,7 +11,9 @@ import qualified Distribution.Dev.RewriteCabalConfig as R
 
 import Control.Applicative ( (<$>) )
 import Data.List ( isPrefixOf )
-import Control.Monad ( unless, (<=<) )
+import Data.Maybe ( fromMaybe )
+import Data.Monoid ( Monoid(..) )
+import Control.Monad ( unless, (<=<), mplus, when )
 import Distribution.Simple.Utils ( rawSystemExit, rawSystemStdout )
 import Distribution.Verbosity ( Verbosity, normal, verbose, showForCabal
                               , deafening, intToVerbosity )
@@ -33,11 +35,13 @@ import System.Console.GetOpt  ( OptDescr(..), ArgOrder(..), ArgDescr(..)
 -- TODO:
 --  * Attempt to use cabal-dev if it's present at the start
 
-data Flag = Verbose (Maybe String)
+data Flag = Verbose (Maybe String) | RunTests
 
 opts :: [OptDescr Flag]
 opts = [ Option "v" ["verbose"] (OptArg Verbose "LEVEL")
          "Specify verbosity level"
+       , Option "" ["run-tests"] (NoArg RunTests)
+         "Run the test suite after bootstrapping"
        ]
 
 -- This function is in base 4 but not base 3
@@ -54,24 +58,43 @@ maybeReads s = case reads s of
                  [(i, [])] -> Just i
                  _         -> Nothing
 
-parseArgs :: [String] -> Either String Verbosity
+parseArgs :: [String] -> Either String Config
 parseArgs args =
     case getOpt Permute opts args of
-      (vs, [] , []) -> case partitionEithers $ map toVerbosity vs of
-                         ([], vs') -> Right $ last (normal:vs')
-                         (es, _  ) -> Left $ unlines es
+      (flgs, [] , []) -> case partitionEithers $ map toConfig flgs of
+                           ([], cfgs) -> Right $ mconcat cfgs
+                           (es, _  ) -> Left $ unlines es
       (_, args, []) -> Left "This program takes no arguments"
       (_, _   , es) -> Left $ unlines es
     where
-      toVerbosity (Verbose Nothing) = Right verbose
-      toVerbosity (Verbose (Just s)) = maybe badSpec Right $ readV s
+
+data Config = Config { cfgVerbosity :: Maybe Verbosity
+                     , cfgRunTests :: Bool
+                     }
+
+instance Monoid Config where
+    mempty = Config Nothing False
+    mappend (Config v1 r1) (Config v2 r2) = Config (v2 `mplus` v1) (r1 || r2)
+
+getVerbosity :: Config -> Verbosity
+getVerbosity = fromMaybe normal . cfgVerbosity
+
+toConfig :: Flag -> Either String Config
+toConfig (Verbose arg) =
+    case arg of
+      Nothing -> ok verbose
+      Just s  -> maybe badSpec ok $ readV s
           where
             badSpec = Left $ "Bad verbosity specification: " ++ show s
+    where
+      ok v = Right mempty { cfgVerbosity = Just v }
       readV = intToVerbosity <=< maybeReads
+toConfig RunTests = Right mempty { cfgRunTests = True }
 
 main :: IO ()
 main = do
-  vb <- either fail return . parseArgs =<< getArgs
+  cfg <- either fail return . parseArgs =<< getArgs
+  let vb = getVerbosity cfg
 
   -- Create a sandbox to hold the installation
   sandbox <- getSandbox
@@ -94,8 +117,9 @@ main = do
                              , "--verbose=" ++ showForCabal vb
                              ]
   let bin = (sandbox </>) . ("bin" </>)
-  rawSystemExit vb (bin "cabal-dev-test")
-                    [bin "cabal-dev", "--plain", "--jxml=test-results.xml"]
+  when (cfgRunTests cfg) $
+       rawSystemExit vb (bin "cabal-dev-test")
+                         [bin "cabal-dev", "--plain", "--jxml=test-results.xml"]
 
 -- The absolute path to the sandbox directory
 getSandbox :: IO FilePath
