@@ -26,6 +26,7 @@ import Distribution.Verbosity    ( Verbosity )
 import System.Directory          ( canonicalizePath, createDirectoryIfMissing
                                  , doesFileExist, copyFile )
 import System.FilePath           ( (</>) )
+import System.IO.Error           ( isAlreadyExistsError, IOError )
 
 import qualified Distribution.Dev.Flags as F ( GlobalFlag(Sandbox), getVerbosity )
 
