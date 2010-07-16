@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, EmptyDataDecls #-}
+{-# LANGUAGE CPP, GADTs, EmptyDataDecls #-}
 module Distribution.Dev.Sandbox
     ( KnownVersion
     , PackageDbType(..)
@@ -81,15 +81,31 @@ newSandbox :: Verbosity -> FilePath -> IO (Sandbox UnknownVersion)
 newSandbox v relSandboxDir = do
   sandboxDir <- canonicalizePath relSandboxDir
   debug v $ "Using " ++ sandboxDir ++ " as the cabal-dev sandbox"
-  createDirectoryIfMissing True sandboxDir
+  robust_createDirectoryIfMissing True sandboxDir
   let sb = UnknownVersion sandboxDir
   debug v $ "Creating local repo " ++ localRepoPath sb
-  createDirectoryIfMissing True $ localRepoPath sb
+  robust_createDirectoryIfMissing True $ localRepoPath sb
   extant <- doesFileExist (indexTar sb)
   unless extant $ do
     emptyIdxFile <- getDataFileName $ "admin" </> indexTarBase
     copyFile emptyIdxFile (indexTar sb)
   return sb
+
+-- | Ugly hack to try and get around a bug with
+-- createDirectoryIfMissing that only occurs on 32-bit windows.
+robust_createDirectoryIfMissing :: Bool -> FilePath -> IO ()
+robust_createDirectoryIfMissing b fp =
+#ifdef mingw32_HOST_OS
+  do
+    r <- try $ createDirectoryIfMissing b fp
+    case (r :: Either IOException ()) of
+      Right ()                    -> return ()
+      Left e
+        | isAlreadyExistsError e -> return ()
+        | otherwise              -> throw e
+#else
+  createDirectoryIfMissing b fp
+#endif
 
 resolveSandbox :: [F.GlobalFlag] -> IO (Sandbox UnknownVersion)
 resolveSandbox flgs = do
