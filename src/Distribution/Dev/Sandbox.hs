@@ -19,6 +19,7 @@ module Distribution.Dev.Sandbox
     )
 where
 
+import Control.Exception.Base    ( try, throw )
 import Control.Monad             ( unless )
 import Data.Maybe                ( listToMaybe )
 import Distribution.Simple.Utils ( debug )
@@ -26,7 +27,8 @@ import Distribution.Verbosity    ( Verbosity )
 import System.Directory          ( canonicalizePath, createDirectoryIfMissing
                                  , doesFileExist, copyFile )
 import System.FilePath           ( (</>) )
-import System.IO.Error           ( try, isAlreadyExistsError, IOError )
+import System.IO.Error           ( isAlreadyExistsError, IOError )
+
 
 import qualified Distribution.Dev.Flags as F ( GlobalFlag(Sandbox), getVerbosity )
 
