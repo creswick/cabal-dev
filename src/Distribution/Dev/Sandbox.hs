@@ -19,7 +19,7 @@ module Distribution.Dev.Sandbox
     )
 where
 
-import Control.Exception.Base    ( try, throw )
+import Control.Exception.Base    ( try, throw, IOException )
 import Control.Monad             ( unless )
 import Data.Maybe                ( listToMaybe )
 import Distribution.Simple.Utils ( debug )
