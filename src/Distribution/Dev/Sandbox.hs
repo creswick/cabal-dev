@@ -102,7 +102,7 @@ vista32Workaround_createDirectoryIfMissing :: Bool -> FilePath -> IO ()
 vista32Workaround_createDirectoryIfMissing b fp =
 #ifdef mingw32_HOST_OS
   createDirectoryIfMissing b fp `catch` \e -> do
-    erCode <- getLastError e
+    erCode <- getLastError
     case erCode of
       1006 -> hPutStrLn stderr "Directory already exists--error swallowed"
       _    -> ioError e
