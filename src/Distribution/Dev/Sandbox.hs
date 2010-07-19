@@ -105,7 +105,7 @@ vista32Workaround_createDirectoryIfMissing b fp =
     erCode <- getLastError e
     case erCode of
       1006 -> hPutStrLn stderr "Directory already exists--error swallowed"
-      _    -> throw e
+      _    -> ioError e
 #else
   createDirectoryIfMissing b fp
 #endif
