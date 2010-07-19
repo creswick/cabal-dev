@@ -83,6 +83,10 @@ Executable cabal-dev-test
       test-framework-hunit >= 0.2,
       HUnit >= 1.2 && <2
 
+  if os(windows)
+     build-depends: Win32 >= 2.1  && < 2.3
+
+
 Executable cabal-dev
   HS-Source-Dirs: src
   Main-is: Main.hs
@@ -110,6 +114,9 @@ Executable cabal-dev
       process >= 1.0 && < 1.1,
       tar >= 0.3 && < 0.4,
       zlib >= 0.5 && < 0.6
+
+  if os(windows)
+     build-depends: Win32 >= 2.1  && < 2.3
 
   Other-modules:
     Distribution.Dev.AddSource,

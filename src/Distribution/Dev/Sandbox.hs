@@ -19,7 +19,6 @@ module Distribution.Dev.Sandbox
     )
 where
 
-import Control.Exception.Base    ( try, throw, IOException )
 import Control.Monad             ( unless )
 import Data.Maybe                ( listToMaybe )
 import Distribution.Simple.Utils ( debug )
@@ -27,8 +26,11 @@ import Distribution.Verbosity    ( Verbosity )
 import System.Directory          ( canonicalizePath, createDirectoryIfMissing
                                  , doesFileExist, copyFile )
 import System.FilePath           ( (</>) )
-import System.IO.Error           ( isAlreadyExistsError, IOError )
+import System.IO                 ( hPutStrLn, stderr )
 
+#ifdef mingw32_HOST_OS
+import System.Win32.Types ( getLastError )
+#endif
 
 import qualified Distribution.Dev.Flags as F ( GlobalFlag(Sandbox), getVerbosity )
 
@@ -84,10 +86,10 @@ newSandbox :: Verbosity -> FilePath -> IO (Sandbox UnknownVersion)
 newSandbox v relSandboxDir = do
   sandboxDir <- canonicalizePath relSandboxDir
   debug v $ "Using " ++ sandboxDir ++ " as the cabal-dev sandbox"
-  robust_createDirectoryIfMissing True sandboxDir
+  vista32Workaround_createDirectoryIfMissing True sandboxDir
   let sb = UnknownVersion sandboxDir
   debug v $ "Creating local repo " ++ localRepoPath sb
-  robust_createDirectoryIfMissing True $ localRepoPath sb
+  vista32Workaround_createDirectoryIfMissing True $ localRepoPath sb
   extant <- doesFileExist (indexTar sb)
   unless extant $ do
     emptyIdxFile <- getDataFileName $ "admin" </> indexTarBase
@@ -96,16 +98,14 @@ newSandbox v relSandboxDir = do
 
 -- | Ugly hack to try and get around a bug with
 -- createDirectoryIfMissing that only occurs on 32-bit windows.
-robust_createDirectoryIfMissing :: Bool -> FilePath -> IO ()
-robust_createDirectoryIfMissing b fp =
+vista32Workaround_createDirectoryIfMissing :: Bool -> FilePath -> IO ()
+vista32Workaround_createDirectoryIfMissing b fp =
 #ifdef mingw32_HOST_OS
-  do
-    r <- try $ createDirectoryIfMissing b fp
-    case (r :: Either IOException ()) of
-      Right ()                    -> return ()
-      Left e
-        | isAlreadyExistsError e -> return ()
-        | otherwise              -> throw e
+  createDirectoryIfMissing b fp `catch` \e -> do
+    erCode <- getLastError e
+    case erCode of
+      1006 -> hPutStrLn stderr "Directory already exists--error swallowed"
+      _    -> throw e
 #else
   createDirectoryIfMissing b fp
 #endif
