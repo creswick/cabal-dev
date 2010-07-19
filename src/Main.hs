@@ -38,6 +38,7 @@ allCommands = [ ("add-source", AddSource.actions)
               , cabal "unpack"
               , cabal "update"
               , cabal "hscolour"
+              , cabal "sdist"
               ]
     where
       cabal s = (s, InvokeCabal.actions s)

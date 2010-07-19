@@ -21,7 +21,7 @@ import System.Console.GetOpt  ( OptDescr(..), ArgOrder(..), ArgDescr(..)
                               )
 
 data GlobalFlag = Help
-                | Verbose String
+                | Verbose (Maybe String)
                 | Sandbox FilePath
                 | CabalConf FilePath
                 | Version Bool
@@ -33,7 +33,7 @@ globalOpts = [ Option "h?" ["help"] (NoArg Help) "Show help text"
                "The location of the development cabal sandbox (default: ./cabal-dev)"
              , Option "c" ["config"] (ReqArg CabalConf "PATH")
                "The location of the cabal-install config file (default: use included)"
-             , Option "v" ["verbose"] (ReqArg Verbose "LEVEL")
+             , Option "v" ["verbose"] (OptArg Verbose "LEVEL")
                "Verbosity level: 0 (silent) - 3 (deafening)"
              , Option "" ["version"] (NoArg (Version False))
                "Show the version of this program"
@@ -68,6 +68,6 @@ getCabalConfig = maybe defaultFileName return . cabalConfigFlag
 
 getVerbosity :: [GlobalFlag] -> Verbosity
 getVerbosity flgs =
-    case map (runReadE flagToVerbosity) [ s | Verbose s <- flgs ] of
-      (Right v:_) -> v
-      _           -> normal
+    case map (fmap $ runReadE flagToVerbosity) [ s | Verbose s <- flgs ] of
+      (Just (Right v):_) -> v
+      _                  -> normal
