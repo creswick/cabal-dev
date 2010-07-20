@@ -5,8 +5,6 @@ module Distribution.Dev.Sandbox
     , Sandbox
     , UnknownVersion
     , cabalConf
-    , defaultSandbox
-    , getSandbox
     , getVersion
     , indexTar
     , indexTarBase
@@ -20,19 +18,18 @@ module Distribution.Dev.Sandbox
 where
 
 import Control.Monad             ( unless )
-import Data.Maybe                ( listToMaybe )
 import Distribution.Simple.Utils ( debug )
 import Distribution.Verbosity    ( Verbosity )
 import System.Directory          ( canonicalizePath, createDirectoryIfMissing
                                  , doesFileExist, copyFile )
 import System.FilePath           ( (</>) )
-import System.IO                 ( hPutStrLn, stderr )
 
 #ifdef mingw32_HOST_OS
 import System.Win32.Types ( getLastError )
 #endif
 
-import qualified Distribution.Dev.Flags as F ( GlobalFlag(Sandbox), getVerbosity )
+import qualified Distribution.Dev.Flags as F
+    ( getVerbosity, Config, getSandbox, sandboxSpecified )
 
 import Paths_cabal_dev ( getDataFileName )
 
@@ -76,12 +73,6 @@ pkgConf s@(KnownVersion _ ty) = sPath (packageDbName ty) s
 cabalConf :: Sandbox a -> FilePath
 cabalConf = sPath "cabal.config"
 
-defaultSandbox :: FilePath
-defaultSandbox = "./cabal-dev"
-
-getSandbox :: [F.GlobalFlag] -> Maybe FilePath
-getSandbox flgs = listToMaybe [ fn | F.Sandbox fn <- flgs ]
-
 newSandbox :: Verbosity -> FilePath -> IO (Sandbox UnknownVersion)
 newSandbox v relSandboxDir = do
   sandboxDir <- canonicalizePath relSandboxDir
@@ -110,16 +101,12 @@ vista32Workaround_createDirectoryIfMissing b fp =
   createDirectoryIfMissing b fp
 #endif
 
-resolveSandbox :: [F.GlobalFlag] -> IO (Sandbox UnknownVersion)
-resolveSandbox flgs = do
-  let v = F.getVerbosity flgs
-  relSandbox <-
-      case getSandbox flgs of
-        Nothing -> do
-          debug v $ "No sandbox specified. Using " ++ defaultSandbox
-          return defaultSandbox
-        Just s -> return $ s
-
+resolveSandbox :: F.Config -> IO (Sandbox UnknownVersion)
+resolveSandbox cfg = do
+  let v = F.getVerbosity cfg
+      relSandbox = F.getSandbox cfg
+  unless (F.sandboxSpecified cfg) $
+         debug v $ "No sandbox specified. Using " ++ relSandbox
   newSandbox v relSandbox
 
 -- |The name of the cabal-install package index

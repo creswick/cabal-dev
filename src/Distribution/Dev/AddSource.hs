@@ -65,7 +65,7 @@ import qualified Data.ByteString.Lazy    as L
 import qualified Distribution.Verbosity  as V
 
 import Distribution.Dev.Command ( CommandActions(..), CommandResult(..) )
-import Distribution.Dev.Flags   ( GlobalFlag, getVerbosity )
+import Distribution.Dev.Flags   ( Config, getVerbosity )
 import Distribution.Dev.Sandbox ( resolveSandbox, localRepoPath
                                 , Sandbox, indexTar, indexTarBase
                                 )
@@ -75,12 +75,12 @@ import Distribution.Simple.Utils ( debug, notice )
 actions :: CommandActions
 actions = CommandActions
             { cmdDesc = "Add packages to a local cabal install repository"
-            , cmdRun = \flgs _ -> addSources flgs
+            , cmdRun = \cfg _ -> addSources cfg
             , cmdOpts = [] :: [OptDescr ()]
             , cmdPassFlags = False
             }
 
-addSources :: [GlobalFlag] -> [String] -> IO CommandResult
+addSources :: Config -> [String] -> IO CommandResult
 addSources _    [] = return $ CommandError "No package locations supplied"
 addSources flgs fns = do
   sandbox <- resolveSandbox flgs
@@ -176,7 +176,7 @@ classifyLocalSource fn =
       isTarGzUri = (reverse ".tar.gz" `isPrefixOf`) . reverse . uriPath
 
 -- |Put the tarball for this package in the local repository
-installTarball :: [GlobalFlag]
+installTarball :: Config
                -> Sandbox a -- ^Location of the local repository
                -> LocalSource -- ^What kind of package source
                -> PackageIdentifier

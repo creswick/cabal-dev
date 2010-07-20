@@ -7,14 +7,14 @@ where
 
 import System.Console.GetOpt ( OptDescr(..) )
 
-import Distribution.Dev.Flags ( GlobalFlag )
+import Distribution.Dev.Flags ( Config )
 
 data CommandResult = CommandError String | CommandOk
 
 data CommandActions
     = forall a . CommandActions
       { cmdDesc :: String
-      , cmdRun :: [GlobalFlag] -> [a] -> [String] -> IO CommandResult
+      , cmdRun :: Config -> [a] -> [String] -> IO CommandResult
       , cmdOpts :: [OptDescr a]
       , cmdPassFlags :: Bool
       }

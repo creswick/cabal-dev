@@ -25,7 +25,7 @@ import System.Console.GetOpt  ( OptDescr )
 import Distribution.Dev.Command            ( CommandActions(..)
                                            , CommandResult(..)
                                            )
-import Distribution.Dev.Flags              ( GlobalFlag, getCabalConfig
+import Distribution.Dev.Flags              ( Config, getCabalConfig
                                            , getVerbosity
                                            )
 import Distribution.Dev.InitPkgDb          ( initPkgDb )
@@ -49,7 +49,7 @@ actions act = CommandActions
               , cmdPassFlags = True
               }
 
-invokeCabal :: [GlobalFlag] -> [String] -> IO CommandResult
+invokeCabal :: Config -> [String] -> IO CommandResult
 invokeCabal flgs args = do
   let v = getVerbosity flgs
   s <- initPkgDb v =<< resolveSandbox flgs
@@ -60,7 +60,7 @@ invokeCabal flgs args = do
              invokeCabalCfg v $ args' ++ args
              return CommandOk
 
-setup :: Sandbox KnownVersion-> [GlobalFlag] -> IO (Either String [String])
+setup :: Sandbox KnownVersion-> Config -> IO (Either String [String])
 setup s flgs = do
   let v = getVerbosity flgs
   cfgIn <- getCabalConfig flgs

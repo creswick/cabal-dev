@@ -14,7 +14,7 @@ import Distribution.Text ( display )
 
 import Distribution.Dev.Command ( CommandActions(..), CommandResult(..) )
 import Distribution.Dev.Flags ( parseGlobalFlags, helpRequested, globalOpts
-                              , GlobalFlag(Version), getOpt''
+                              , GlobalFlag(Version), getOpt'', fromFlags
                               )
 import qualified Distribution.Dev.AddSource as AddSource
 import qualified Distribution.Dev.InvokeCabal as InvokeCabal
@@ -130,5 +130,5 @@ runCmd cmdAct flgs args
                           then getOpt'' o args
                           else getOpt Permute o args
                   in if null cmdErrs
-                     then r flgs cmdFlags cmdArgs
+                     then r (fromFlags flgs) cmdFlags cmdArgs
                      else showError cmdErrs

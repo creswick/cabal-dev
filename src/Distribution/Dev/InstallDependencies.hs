@@ -4,7 +4,7 @@ where
 
 import System.Console.GetOpt ( OptDescr(..) )
 import Distribution.Dev.Command ( CommandActions(..), CommandResult(..) )
-import Distribution.Dev.Flags ( GlobalFlag, getVerbosity )
+import Distribution.Dev.Flags ( Config, getVerbosity )
 import Distribution.Dev.Sandbox ( resolveSandbox )
 import Distribution.Dev.InitPkgDb ( initPkgDb )
 import Distribution.Dev.InvokeCabal ( setup, cabalProgram )
@@ -18,12 +18,12 @@ import Distribution.Simple.Utils ( notice )
 actions :: CommandActions
 actions = CommandActions
               { cmdDesc = "Install the dependencies for this package"
-              , cmdRun = \flgs _ args -> installDependencies flgs args
+              , cmdRun = \cfg _ args -> installDependencies cfg args
               , cmdOpts = [] :: [OptDescr ()]
               , cmdPassFlags = True
               }
 
-installDependencies :: [GlobalFlag] -> [String] -> IO CommandResult
+installDependencies :: Config -> [String] -> IO CommandResult
 installDependencies flgs pkgNames = do
   let v = getVerbosity flgs
   s <- initPkgDb v =<< resolveSandbox flgs
