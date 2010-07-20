@@ -73,7 +73,7 @@ rewriteField expand field =
 -- Output formatting
 
 ppField :: Field -> Doc
-ppField (F _ k v) = text k <> colon <+> text (show v)
+ppField (F _ k v) = text k <> colon <+> text v
 ppField (Section _ k v fs) = (text k <+> text v) $+$
                              nest 2 (vcat $ map ppField fs)
 ppField f = error $ "Pretty printing not implemented: " ++ show f
@@ -151,4 +151,4 @@ expandCabalConfig home sandbox =
                  , eSections = []
                  }
 
-      ePath = canonicalizePath . expandDot sandbox . expandTilde home
+      ePath = fmap show . canonicalizePath . expandDot sandbox . expandTilde home
