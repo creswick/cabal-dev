@@ -38,8 +38,10 @@ tests :: FilePath -> [Test]
 tests p =
     [ testGroup "Basic invocation tests" $ testBasicInvocation p
     , testGroup "Sandboxed" $
-      [ testCase "add-source stays sandboxed" $
-        addSourceStaysSandboxed normal p
+      [ testCase "add-source stays sandboxed (no-space dir)" $
+        addSourceStaysSandboxed normal p "fake-package.",
+        testCase "add-source stays sandboxed (dir with spaces)" $
+        addSourceStaysSandboxed normal p "fake package."
       ]
     ]
 
@@ -161,8 +163,8 @@ mkRandomPkgId = PackageIdentifier <$> getRandomName <*> getRandomVersion
 
       pkgChar c = isAscii c && isAlphaNum c
 
-addSourceStaysSandboxed :: Verbosity -> FilePath -> HUnit.Assertion
-addSourceStaysSandboxed v cabalDev =
+addSourceStaysSandboxed :: Verbosity -> FilePath -> String -> HUnit.Assertion
+addSourceStaysSandboxed v cabalDev dirName =
     do pConf <- configurePrerequisites
        let readPackageIndex stack = getInstalledPackages v stack pConf
 
@@ -176,7 +178,7 @@ addSourceStaysSandboxed v cabalDev =
        -- Create a temporary directory in which to build and install
        -- the bogus package
        tmp <- getTemporaryDirectory
-       withTempDirectory v tmp "fake-package." $ \d -> do
+       withTempDirectory v tmp dirName $ \d -> do
          let sandboxDir = d </> "cabal-dev"
          sandbox <- initPkgDb v =<< newSandbox v sandboxDir
 
