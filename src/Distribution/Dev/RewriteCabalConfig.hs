@@ -151,4 +151,4 @@ expandCabalConfig home sandbox =
                  , eSections = []
                  }
 
-      ePath = canonicalizePath . expandDot sandbox . expandTilde home
+      ePath = fmap show . canonicalizePath . expandDot sandbox . expandTilde home
