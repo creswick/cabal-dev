@@ -65,7 +65,7 @@ Executable ghc-pkg-6_8-compat
 Executable cabal-dev-test
   Main-is: RunTests.hs
   GHC-Options: -Wall
-  HS-Source-Dirs: src
+  HS-Source-Dirs: src, test
   if flag(no-cabal-dev) || !flag(build-tests)
     Buildable: False
   else
