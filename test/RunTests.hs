@@ -3,6 +3,7 @@ import Control.Monad ( replicateM, when )
 import Control.Monad.Random ( Rand, getRandomR, evalRandIO )
 import Data.Char ( isAscii, isAlphaNum, isLetter )
 import Data.List ( intercalate )
+import Data.Monoid ( mempty )
 import Distribution.Package ( PackageIdentifier(..), PackageName(..)
                             , packageId, packageName )
 import Distribution.Simple.GHC ( getInstalledPackages )
@@ -34,6 +35,14 @@ import Test.Framework ( defaultMainWithArgs, Test, testGroup )
 import Test.Framework.Providers.HUnit ( testCase )
 import qualified Test.HUnit as HUnit
 
+import Distribution.Client.Config -- ( parseConfig )
+import Distribution.Client.Setup ( GlobalFlags(..) )
+import Distribution.Simple.InstallDirs
+import Distribution.Simple.Setup
+import Distribution.ParseUtils
+import Data.Function ( on )
+
+
 tests :: FilePath -> [Test]
 tests p =
     [ testGroup "Basic invocation tests" $ testBasicInvocation p
@@ -42,6 +51,13 @@ tests p =
         addSourceStaysSandboxed normal p "fake-package.",
         testCase "add-source stays sandboxed (dir with spaces)" $
         addSourceStaysSandboxed normal p "fake package."
+      ]
+    , testGroup "Parsing and serializing" $
+      [ testCase "simple round-trip test" $
+        assertRoundTrip
+
+      -- , testCase "sample echo test" $
+      --   configEcho
       ]
     ]
 
@@ -59,7 +75,6 @@ testBasicInvocation p =
 
     , testCase "exits with failure when no arguments are supplied" $
       assertExitsFailure p []
-
     ]
 
 main :: IO ()
@@ -74,6 +89,33 @@ main = do
             []     -> ("cabal-dev", [])
 
   defaultMainWithArgs (tests cabalDev) testFrameworkArgs
+
+-- configEcho :: HUnit.Assertion
+-- configEcho = putStrLn $ showConfig sampleConfig
+
+sampleConfig :: SavedConfig
+sampleConfig = mempty { savedGlobalFlags = mempty { globalLocalRepos = ["/home/cre swick"]
+                                                  , globalCacheDir = toFlag "/home/creswick/cabal files/cache/"}
+                      , savedUserInstallDirs = mempty { prefix = toFlag $ toPathTemplate "/home/creswick/cabal files"
+                                                      , bindir = toFlag $ toPathTemplate "/home/creswick/cabal files/some/bin" }
+                      , savedConfigureFlags = mempty { configPackageDB = toFlag $
+                                                           SpecificPackageDB "/home/creswick/cabal files/package.db"}
+                      }
+
+assertRoundTrip :: HUnit.Assertion
+assertRoundTrip = do
+  isEqual sampleConfig =<< roundTrip sampleConfig
+  where roundTrip conf = case parseConfig mempty $ showConfig conf of
+          ParseFailed err -> fail $ "Parse failed: "++show err
+          ParseOk _ val   -> return val
+
+isEqual :: SavedConfig -> SavedConfig -> HUnit.Assertion
+isEqual a b = do let check msg f = (HUnit.assertEqual msg `on` f) a b
+                 check "globalLocalRepos" (globalLocalRepos . savedGlobalFlags)
+                 check "prefix" (show . prefix . savedUserInstallDirs)
+                 check "bindir" (show . bindir . savedUserInstallDirs)
+                 check "packageDB" (configPackageDB . savedConfigureFlags)
+                 check "cache" (globalCacheDir . savedGlobalFlags)
 
 assertProgramOutput :: FilePath -> [String] -> (String -> HUnit.Assertion)
                     -> HUnit.Assertion
