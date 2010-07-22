@@ -25,6 +25,7 @@ import System.Directory          ( canonicalizePath, createDirectoryIfMissing
 import System.FilePath           ( (</>) )
 
 #ifdef mingw32_HOST_OS
+import System.IO ( hPutStrLn, stderr )
 import System.Win32.Types ( getLastError )
 #endif
 
