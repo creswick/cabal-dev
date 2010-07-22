@@ -9,12 +9,13 @@ import Control.Monad ( unless )
 import System.Exit ( exitWith, ExitCode(..) )
 import System.Environment ( getArgs, getProgName )
 import System.Console.GetOpt ( usageInfo, getOpt, ArgOrder(Permute) )
-import Distribution.Simple.Utils ( cabalVersion )
+import Distribution.Simple.Utils ( cabalVersion, debug )
 import Distribution.Text ( display )
 
 import Distribution.Dev.Command ( CommandActions(..), CommandResult(..) )
 import Distribution.Dev.Flags ( parseGlobalFlags, helpRequested, globalOpts
                               , GlobalFlag(Version), getOpt'', fromFlags
+                              , getVerbosity, Config
                               )
 import qualified Distribution.Dev.AddSource as AddSource
 import qualified Distribution.Dev.InvokeCabal as InvokeCabal
@@ -45,11 +46,14 @@ allCommands = [ ("add-source", AddSource.actions)
 
 printVersion :: IO ()
 printVersion = do
-  putStr $ unlines $
-             [ "cabal-dev " ++ showVersion version
-             , "built with Cabal " ++ display cabalVersion
-             ]
+  putStr versionString
   exitWith ExitSuccess
+
+versionString :: String
+versionString = unlines $
+                [ "cabal-dev " ++ showVersion version
+                , "built with Cabal " ++ display cabalVersion
+                ]
 
 printNumericVersion :: IO ()
 printNumericVersion = do
@@ -69,10 +73,18 @@ main = do
     (False:_) -> printVersion
     [] -> return ()
 
+  let cfg = fromFlags globalFlags
+  debug (getVerbosity cfg) versionString
+
   case args of
     (name:args') ->
         case nameCmd name of
-          Just cmdAct -> runCmd cmdAct globalFlags args'
+          Just cmdAct | helpRequested globalFlags ->
+                          do putStrLn $ cmdDesc cmdAct
+                             putStr =<< globalUsage
+                             exitWith ExitSuccess
+                      | otherwise -> runCmd cmdAct cfg args'
+
           Nothing -> do putStrLn $ "Unknown command: " ++ show name
                         putStr =<< globalUsage
                         exitWith (ExitFailure 1)
@@ -105,23 +117,17 @@ allCommandNames = map fst allCommands
 nameCmd :: String -> Maybe CommandActions
 nameCmd s = listToMaybe [a | (n, a) <- allCommands, n == s]
 
-runCmd :: CommandActions -> [GlobalFlag] -> [String] -> IO ()
-runCmd cmdAct flgs args
-    | helpRequested flgs = showHelp
-    | otherwise = do res <- run
-                     case res of
-                       CommandOk        -> exitWith ExitSuccess
-                       CommandError msg -> showError [msg]
+runCmd :: CommandActions -> Config -> [String] -> IO ()
+runCmd cmdAct cfg args =
+    do res <- run
+       case res of
+         CommandOk        -> exitWith ExitSuccess
+         CommandError msg -> showError [msg]
     where
       showError msgs = do
         putStr $ unlines $ "FAILED:":msgs ++ [replicate 50 '-', cmdDesc cmdAct]
         putStr =<< globalUsage
         exitWith (ExitFailure 1)
-
-      showHelp = do
-        putStrLn $ cmdDesc cmdAct
-        putStr =<< globalUsage
-        exitWith ExitSuccess
 
       run = case cmdAct of
               (CommandActions _ r o passFlags) ->
@@ -130,5 +136,5 @@ runCmd cmdAct flgs args
                           then getOpt'' o args
                           else getOpt Permute o args
                   in if null cmdErrs
-                     then r (fromFlags flgs) cmdFlags cmdArgs
+                     then r cfg cmdFlags cmdArgs
                      else showError cmdErrs

@@ -11,15 +11,18 @@ import Distribution.Verbosity ( Verbosity, showForCabal )
 import Distribution.Simple.Program ( Program( programFindVersion
                                             , programFindLocation
                                             )
-                                   , findProgramVersion
-                                   , simpleProgram
-                                   , runProgram
-                                   , requireProgram
-                                   , programLocation
-                                   , locationPath
                                    , emptyProgramConfiguration
+                                   , findProgramVersion
+                                   , locationPath
+                                   , programLocation
+                                   , programVersion
+                                   , requireProgram
+                                   , runProgram
+                                   , simpleProgram
                                    )
-import Distribution.Simple.Utils ( withUTF8FileContents, writeUTF8File )
+import Distribution.Simple.Utils ( withUTF8FileContents, writeUTF8File
+                                 , debug )
+import Distribution.Text ( display )
 import System.Console.GetOpt  ( OptDescr )
 
 import Distribution.Dev.Command            ( CommandActions(..)
@@ -121,4 +124,9 @@ cabalProgram =
 invokeCabalCfg :: Verbosity -> [String] -> IO ()
 invokeCabalCfg v args = do
   (cabal, _) <- requireProgram v cabalProgram emptyProgramConfiguration
+  debug v $ concat [ "Using cabal-install "
+                   , maybe "(unknown version)" display $ programVersion cabal
+                   , " at "
+                   , show (programLocation cabal)
+                   ]
   runProgram v cabal args
