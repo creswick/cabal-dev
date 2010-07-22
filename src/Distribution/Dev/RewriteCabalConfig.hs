@@ -135,7 +135,7 @@ expandCabalConfig home sandbox =
            }
     where
       expandInstallDirs =
-          Expand { eExpand = ePath
+          Expand { eExpand = fmap show . ePath
                  , eLeaves =
                      [ "prefix"
                      , "bindir"
@@ -151,4 +151,4 @@ expandCabalConfig home sandbox =
                  , eSections = []
                  }
 
-      ePath = fmap show . canonicalizePath . expandDot sandbox . expandTilde home
+      ePath =  canonicalizePath . expandDot sandbox . expandTilde home
