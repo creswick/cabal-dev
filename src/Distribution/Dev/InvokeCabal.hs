@@ -7,6 +7,7 @@ module Distribution.Dev.InvokeCabal
     )
 where
 
+import Distribution.Version ( Version(..) )
 import Distribution.Verbosity ( Verbosity, showForCabal )
 import Distribution.Simple.Program ( Program( programFindVersion
                                             , programFindLocation
@@ -21,7 +22,7 @@ import Distribution.Simple.Program ( Program( programFindVersion
                                    , simpleProgram
                                    )
 import Distribution.Simple.Utils ( withUTF8FileContents, writeUTF8File
-                                 , debug )
+                                 , debug, cabalVersion )
 import Distribution.Text ( display )
 import System.Console.GetOpt  ( OptDescr )
 
@@ -90,12 +91,10 @@ extraArgs v cfg pdb =
       withGhcPkg = longArg "with-ghc-pkg"
       getPdbArgs =
           case pdb of
-            -- Make Cabal call the wrapper that removes the bad
-            -- argument to ghc-pkg 6.8
-            --
-            -- XXX: If cabal-install is using a version of Cabal that
-            -- does not have this bug, it should not use the wrapper!
-            (GHC_6_8_Db loc) -> do
+            (GHC_6_8_Db loc) | needsGHC68Compat -> do
+                     -- Make Cabal call the wrapper that removes the
+                     -- bad argument to ghc-pkg 6.8
+                     debug v $ "Using GHC 6.8 compatibility wrapper for Cabal shortcoming"
                      (ghcPkgCompat, _) <-
                          requireProgram v ghcPkgCompatProgram emptyProgramConfiguration
                      return $ [ longArg "ghc-pkg-options" $ withGhcPkg loc
@@ -103,6 +102,11 @@ extraArgs v cfg pdb =
                                 programLocation ghcPkgCompat
                               ]
             _ -> return []
+
+-- XXX: this is very imprecise. Right now, we require a specific
+-- version of Cabal, so this is ok (and is equivalent to True)
+needsGHC68Compat :: Bool
+needsGHC68Compat = cabalVersion < Version [1, 8] []
 
 ghcPkgCompatProgram :: Program
 ghcPkgCompatProgram  = p { programFindLocation =
