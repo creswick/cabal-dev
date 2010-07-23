@@ -265,26 +265,33 @@ addSourceStaysSandboxed v cabalDev dirName =
 
 assertLogLocationOk :: Verbosity -> FilePath -> HUnit.Assertion
 assertLogLocationOk v cabalDev =
-    mapM_ setupLogs [ const $ return ()
-                    , createDirectory
-                    , (`writeFile` "bogus log data")
-                    ]
+    mapM_ setupLogs
+              [ -- Works fine when its not there
+                (assertExitsSuccess, const $ return ())
+
+              , -- Works fine when its a directory
+                (assertExitsSuccess, createDirectory)
+
+              , -- Fails if it's a file
+                (assertExitsFailure, (`writeFile` "bogus log data"))
+              ]
     where
-      setupLogs act =
-          withTempPackage v "check-build-log" $ \_ packageDir sb pId -> do
+      setupLogs (expectation, act) =
+          withTempPackage v "check-build-log." $ \_ packageDir sb pId -> do
             let pkgStr = display pId
+            let logsPth = sandbox sb </> "logs"
+            let lsMsg msg = do
+                  putStrLn msg
+                  rawSystem "ls" ["-ld", logsPth]
+                  return ()
             let withCabalDev f aa = do
                   f cabalDev (["-s", sandbox sb] ++ aa)
-            act $ sandbox sb </> "logs"
-            putStrLn "BEFORE"
-            rawSystem "ls" ["-ld", sandbox sb </> "logs"]
+
+            act logsPth
+            lsMsg "BEFORE"
             withCabalDev assertExitsSuccess ["add-source", packageDir]
-            withCabalDev assertExitsSuccess ["install", pkgStr]
-            -- Do it again to make sure the state hasn't messed it up
-            withCabalDev assertExitsSuccess ["install", pkgStr]
-            putStrLn "AFTER"
-            rawSystem "ls" ["-ld", sandbox sb </> "logs"]
-            return ()
+            withCabalDev expectation ["install", pkgStr]
+            lsMsg "AFTER"
 
 -- A human-readable package index dump
 dumpIndex :: PackageIndex -> String
