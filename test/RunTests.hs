@@ -14,9 +14,11 @@ import Distribution.Simple.Program ( configureAllKnownPrograms
                                    , emptyProgramConfiguration
                                    , ghcPkgProgram
                                    , ghcProgram
+                                   , ProgramConfiguration
                                    )
 import Distribution.Simple.PackageIndex ( lookupSourcePackageId, allPackages
                                         , SearchResult(..), searchByName
+                                        , PackageIndex
                                         )
 import Distribution.InstalledPackageInfo ( installedPackageId )
 import Distribution.Simple.Utils ( rawSystemStdout, withTempDirectory, info )
@@ -24,7 +26,7 @@ import Distribution.Text ( simpleParse, display )
 import Distribution.Verbosity ( normal, Verbosity, showForCabal )
 import Distribution.Version ( Version(..) )
 import Distribution.Dev.InitPkgDb ( initPkgDb )
-import Distribution.Dev.Sandbox ( newSandbox, pkgConf )
+import Distribution.Dev.Sandbox ( newSandbox, pkgConf, Sandbox, KnownVersion, sandbox )
 import System.Cmd ( rawSystem )
 import System.Directory ( getTemporaryDirectory, createDirectory )
 import System.Environment ( getArgs )
@@ -51,6 +53,8 @@ tests p =
         addSourceStaysSandboxed normal p "fake-package.",
         testCase "add-source stays sandboxed (dir with spaces)" $
         addSourceStaysSandboxed normal p "fake package."
+      , testCase "Builds ok regardless of the state of the logs directory" $
+        assertLogLocationOk normal p
       ]
     , testGroup "Parsing and serializing" $
       [ testCase "simple round-trip test" $
@@ -205,114 +209,150 @@ mkRandomPkgId = PackageIdentifier <$> getRandomName <*> getRandomVersion
 
       pkgChar c = isAscii c && isAlphaNum c
 
-addSourceStaysSandboxed :: Verbosity -> FilePath -> String -> HUnit.Assertion
+addSourceStaysSandboxed :: Verbosity -> FilePath -> FilePath -> HUnit.Assertion
 addSourceStaysSandboxed v cabalDev dirName =
-    do pConf <- configurePrerequisites
-       let readPackageIndex stack = getInstalledPackages v stack pConf
+    withTempPackage v dirName $ \readPackageIndex packageDir sb pId -> do
+      let pkgStr = display pId
+      sbPkgs <- readPackageIndex (privateStack sb)
+      gPkgs <- readPackageIndex globalStack
+      -- XXX: Cabal returns a single "empty" package if you try to
+      -- read an empty package db
+      let s = filter ((/= "") . display) .
+              map installedPackageId .
+              allPackages
+      HUnit.assertEqual
+               "Newly created package index should be empty"
+               (s gPkgs) (s sbPkgs)
 
-       -- Get the shared package index and choose a package identifier
-       -- that is not in it
-       pkgIdx <- readPackageIndex sharedStack
-       info v $ dumpIndex pkgIdx
-       pId <- findUnusedPackageId pkgIdx
-       let pkgStr = display pId
+      let withCabalDev f aa = do
+            f cabalDev (["-s", sandbox sb] ++ aa)
 
-       -- Create a temporary directory in which to build and install
-       -- the bogus package
-       tmp <- getTemporaryDirectory
-       withTempDirectory v tmp dirName $ \d -> do
-         let sandboxDir = d </> "cabal-dev"
-         sandbox <- initPkgDb v =<< newSandbox v sandboxDir
+      -- Fails because the package is not available. XXX: this
+      -- could fail if our randomly chosen filename is available on
+      -- hackage. We should actually use a cabal-install config
+      -- with an empty package index
+      withCabalDev assertExitsFailure ["install", pkgStr]
 
-         sbPkgs <- readPackageIndex (privateStack sandbox)
-         gPkgs <- readPackageIndex globalStack
-         -- XXX: Cabal returns a single "empty" package if you try to
-         -- read an empty package db
-         let s = filter ((/= "") . display) .
-                 map installedPackageId .
-                 allPackages
-         HUnit.assertEqual
-                  "Newly created package index should be empty"
-                  (s gPkgs) (s sbPkgs)
+      withCabalDev assertExitsSuccess ["add-source", packageDir]
 
-         let packageDir = d </> "pkg"
-         let cabalFileName = packageDir </> display (pkgName pId) <.> "cabal"
-         createDirectory packageDir
-         writeFile cabalFileName $ genCabalFile pId
+      -- Do the installation. Now this library should be registered
+      -- with GHC
+      withCabalDev assertExitsSuccess
+                       ["install", pkgStr, "--verbose=" ++ showForCabal v]
 
-         let withCabalDev f aa = do
-               f cabalDev (["-s", sandboxDir] ++ aa)
+      -- Check that we can find the library in our private package db stack
+      pkgIdx' <- readPackageIndex (privateStack sb)
+      info v $ dumpIndex pkgIdx'
+      case lookupSourcePackageId pkgIdx' pId of
+        []  -> HUnit.assertFailure $
+               "After installation, package " ++ pkgStr ++ " was not found"
+        [_] -> return ()
+        _   -> HUnit.assertFailure $
+               "Unexpectedly got more than one match for " ++ pkgStr
 
-         -- Fails because the package is not available. XXX: this
-         -- could fail if our randomly chosen filename is available on
-         -- hackage. We should actually use a cabal-install config
-         -- with an empty package index
-         withCabalDev assertExitsFailure ["install", pkgStr]
-
-         withCabalDev assertExitsSuccess ["add-source", packageDir]
-
-         -- Do the installation. Now this library should be registered
-         -- with GHC
-         withCabalDev assertExitsSuccess
-                          ["install", pkgStr, "--verbose=" ++ showForCabal v]
-
-         -- Check that we can find the library in our private package db stack
-         pkgIdx' <- readPackageIndex (privateStack sandbox)
-         info v $ dumpIndex pkgIdx'
-         case lookupSourcePackageId pkgIdx' pId of
-           []  -> HUnit.assertFailure $
-                  "After installation, package " ++ pkgStr ++ " was not found"
-           [_] -> return ()
-           _   -> HUnit.assertFailure $
-                  "Unexpectedly got more than one match for " ++ pkgStr
-
-         -- And that we can't find it in the shared package db stack
-         sharedIdx <- readPackageIndex sharedStack
-         info v $ dumpIndex sharedIdx
-         case lookupSourcePackageId sharedIdx pId of
-           []  -> return ()
-           _   -> HUnit.assertFailure $
-                  "Found " ++ pkgStr ++ " in a shared package db!"
+      -- And that we can't find it in the shared package db stack
+      sharedIdx <- readPackageIndex sharedStack
+      info v $ dumpIndex sharedIdx
+      case lookupSourcePackageId sharedIdx pId of
+        []  -> return ()
+        _   -> HUnit.assertFailure $
+               "Found " ++ pkgStr ++ " in a shared package db!"
     where
-      -- A human-readable package index dump
-      dumpIndex pkgIdx = unlines $ "Package index contents:":
-                         map (showString "  " . display . packageId)
-                         (allPackages pkgIdx)
+      -- The package dbs that cabal-dev will consult
+      privateStack sb = [GlobalPackageDB, SpecificPackageDB $ pkgConf sb]
 
-      -- Return a program database containing the programs we need to
-      -- load a package index
-      configurePrerequisites =
-        configureAllKnownPrograms v $
-        addKnownPrograms toConfigure emptyProgramConfiguration
+      globalStack = [GlobalPackageDB]
 
+assertLogLocationOk :: Verbosity -> FilePath -> HUnit.Assertion
+assertLogLocationOk v cabalDev =
+    mapM_ setupLogs [ const $ return ()
+                    , createDirectory
+                    , (`writeFile` "bogus log data")
+                    ]
+    where
+      setupLogs act =
+          withTempPackage v "check-build-log" $ \_ packageDir sb pId -> do
+            let pkgStr = display pId
+            let withCabalDev f aa = do
+                  f cabalDev (["-s", sandbox sb] ++ aa)
+            act $ sandbox sb </> "logs"
+            putStrLn "BEFORE"
+            rawSystem "ls" ["-ld", sandbox sb </> "logs"]
+            withCabalDev assertExitsSuccess ["add-source", packageDir]
+            withCabalDev assertExitsSuccess ["install", pkgStr]
+            -- Do it again to make sure the state hasn't messed it up
+            withCabalDev assertExitsSuccess ["install", pkgStr]
+            putStrLn "AFTER"
+            rawSystem "ls" ["-ld", sandbox sb </> "logs"]
+            return ()
+
+-- A human-readable package index dump
+dumpIndex :: PackageIndex -> String
+dumpIndex pkgIdx = unlines $ "Package index contents:":
+                   map (showString "  " . display . packageId)
+                   (allPackages pkgIdx)
+
+-- Return a program database containing the programs we need to
+-- load a package index
+configurePrerequisites :: Verbosity -> IO ProgramConfiguration
+configurePrerequisites v =
+    configureAllKnownPrograms v $
+    addKnownPrograms toConfigure emptyProgramConfiguration
+    where
       -- The programs that need to be configured in order to load a
       -- package index
       toConfigure = [ ghcPkgProgram
                     , ghcProgram
                     ]
 
-      -- The package dbs that cabal-dev will consult
-      privateStack sb = [GlobalPackageDB, SpecificPackageDB $ pkgConf sb]
+-- The package dbs that we do not want to pollute
+sharedStack :: [PackageDB]
+sharedStack = [GlobalPackageDB, UserPackageDB]
 
-      -- The package dbs that we do not want to pollute
-      sharedStack = [GlobalPackageDB, UserPackageDB]
+-- Given a package index, generate a package name that is not in
+-- that index. It is unlikely that a randomly generated name
+-- will be in the package index, but we will try three times to
+-- make it wildly unlikely.
+findUnusedPackageId :: Verbosity -> PackageIndex -> IO PackageIdentifier
+findUnusedPackageId v pkgIdx = go []
+    where
+      go ps = do
+        when (length ps > 2) $ HUnit.assertFailure $
+             showString "Failed to find an unused package id. Tried:" $
+             intercalate " " $
+             map display ps
 
-      globalStack = [GlobalPackageDB]
+        pId <- evalRandIO mkRandomPkgId
+        case searchByName pkgIdx (display $ packageName pId) of
+          None -> do info v $ "Found unused package " ++ display pId
+                     return pId
+          _    -> go (pId:ps)
 
-      -- Given a package index, generate a package name that is not in
-      -- that index. It is unlikely that a randomly generated name
-      -- will be in the package index, but we will try three times to
-      -- make it wildly unlikely.
-      findUnusedPackageId pkgIdx = go []
-          where
-            go ps = do
-              when (length ps > 2) $ HUnit.assertFailure $
-                   showString "Failed to find an unused package id. Tried:" $
-                   intercalate " " $
-                   map display ps
+withTempPackage
+    :: Verbosity -> String
+    -> (([PackageDB] -> IO PackageIndex)
+        -> FilePath
+        -> Sandbox KnownVersion -> PackageIdentifier -> HUnit.Assertion)
+    -> HUnit.Assertion
+withTempPackage v dirName f =
+    do pConf <- configurePrerequisites v
+       let readPackageIndex stack = getInstalledPackages v stack pConf
 
-              pId <- evalRandIO mkRandomPkgId
-              case searchByName pkgIdx (display $ packageName pId) of
-                None -> do info v $ "Found unused package " ++ display pId
-                           return pId
-                _    -> go (pId:ps)
+       -- Get the shared package index and choose a package identifier
+       -- that is not in it
+       pkgIdx <- readPackageIndex sharedStack
+       info v $ dumpIndex pkgIdx
+       pId <- findUnusedPackageId v pkgIdx
+
+       -- Create a temporary directory in which to build and install
+       -- the bogus package
+       tmp <- getTemporaryDirectory
+       withTempDirectory v tmp dirName $ \d -> do
+         let sandboxDir = d </> "cabal-dev"
+         let packageDir = d </> "pkg"
+         let cabalFileName = packageDir </> display (pkgName pId) <.> "cabal"
+         createDirectory packageDir
+         writeFile cabalFileName $ genCabalFile pId
+
+         sb <- initPkgDb v =<< newSandbox v sandboxDir
+         f readPackageIndex packageDir sb pId
