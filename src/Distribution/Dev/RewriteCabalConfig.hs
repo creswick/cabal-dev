@@ -18,7 +18,6 @@ where
 import Data.Maybe                ( fromMaybe )
 import Control.Monad             ( liftM )
 import Distribution.ParseUtils   ( readFields, ParseResult(..), Field(..) )
-import System.Directory          ( canonicalizePath )
 import Text.PrettyPrint.HughesPJ
 
 data Rewrite = Rewrite { homeDir :: FilePath

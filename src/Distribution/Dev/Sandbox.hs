@@ -18,6 +18,7 @@ module Distribution.Dev.Sandbox
 where
 
 import Control.Monad             ( unless )
+import Data.Version              ( Version, showVersion )
 import Distribution.Simple.Utils ( debug )
 import Distribution.Verbosity    ( Verbosity )
 import System.Directory          ( canonicalizePath, createDirectoryIfMissing
@@ -41,22 +42,22 @@ data KnownVersion
 
 data Sandbox a where
     UnknownVersion :: FilePath -> Sandbox UnknownVersion
-    KnownVersion :: FilePath -> PackageDbType -> Sandbox KnownVersion
+    KnownVersion :: FilePath -> PackageDbType -> Version -> Sandbox KnownVersion
 
 data PackageDbType = GHC_6_8_Db FilePath | GHC_6_10_Db | GHC_6_12_Db
 
 -- NOTE: GHC < 6.12: compilation warnings about non-exhaustive pattern
 -- matches are spurious (we'd get a type error if we tried to make
 -- them complete!)
-setVersion :: Sandbox UnknownVersion -> PackageDbType -> Sandbox KnownVersion
-setVersion (UnknownVersion p) ty = KnownVersion p ty
+setVersion :: Sandbox UnknownVersion -> PackageDbType -> Version -> Sandbox KnownVersion
+setVersion (UnknownVersion p) v ty = KnownVersion p v ty
 
 getVersion :: Sandbox KnownVersion -> PackageDbType
-getVersion (KnownVersion _ db) = db
+getVersion (KnownVersion _ db _) = db
 
 sandbox :: Sandbox a -> FilePath
 sandbox (UnknownVersion p) = p
-sandbox (KnownVersion p _) = p
+sandbox (KnownVersion p _ _) = p
 
 sPath :: FilePath -> Sandbox a -> FilePath
 sPath p s = sandbox s </> p
@@ -65,11 +66,9 @@ localRepoPath :: Sandbox a -> FilePath
 localRepoPath = sPath "packages"
 
 pkgConf :: Sandbox KnownVersion -> FilePath
-pkgConf s@(KnownVersion _ ty) = sPath (packageDbName ty) s
+pkgConf s@(KnownVersion _ _ v) = sPath packageDbName s
     where
-      packageDbName (GHC_6_8_Db _) = "packages-6.8.conf"
-      packageDbName GHC_6_10_Db = "packages-6.10.conf"
-      packageDbName GHC_6_12_Db = "packages.conf.d"
+      packageDbName = "packages-" ++ showVersion v ++ ".conf"
 
 cabalConf :: Sandbox a -> FilePath
 cabalConf = sPath "cabal.config"

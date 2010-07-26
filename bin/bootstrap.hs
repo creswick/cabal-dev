@@ -11,7 +11,8 @@ import qualified Distribution.Dev.RewriteCabalConfig as R
 
 import Control.Applicative ( (<$>) )
 import Data.List ( isPrefixOf )
-import Data.Maybe ( fromMaybe )
+import Data.Version ( Version(..), showVersion, parseVersion )
+import Data.Maybe ( fromMaybe, maybeToList )
 import Data.Monoid ( Monoid(..) )
 import Control.Monad ( unless, (<=<), mplus, when )
 import Distribution.Simple.Utils ( rawSystemExit, rawSystemStdout )
@@ -25,6 +26,7 @@ import System.Environment ( getArgs )
 import System.Console.GetOpt  ( OptDescr(..), ArgOrder(..), ArgDescr(..)
                               , getOpt
                               )
+import Text.ParserCombinators.ReadP ( readP_to_S )
 
 -- We would use cabal-dev itself here, but we use something a little
 -- more brittle in order to make this code work with the Cabal that
@@ -81,12 +83,10 @@ getSandbox = canonicalizePath "cabal-dev"
 -- I expect that would be more work than re-implementing the minimal
 -- functionality we need here.
 
-data GHCVer = V6_8 | V6_10 | V6_12
-
 -- |Initialize a GHC package database in the specified sandbox,
 -- returning the package database path and the version of GHC that it
 -- corresponds to.
-initGhcPkgDb :: Verbosity -> FilePath -> IO (FilePath, GHCVer)
+initGhcPkgDb :: Verbosity -> FilePath -> IO (FilePath, Version)
 initGhcPkgDb vb sbox = do
   ver <- identifyGhcPkg vb
   let (fn, doInit) = ghcPkgSettings ver
@@ -98,32 +98,50 @@ initGhcPkgDb vb sbox = do
   return (loc, ver)
 
 -- |Identify the GHC version by calling ghc-pkg and parsing its output
-identifyGhcPkg :: Verbosity -> IO GHCVer
-identifyGhcPkg vb = do
-  verStr <- rawSystemStdout vb "ghc-pkg" ["--version"]
-  let isVer6 v = isGHCPkg6 v verStr
-  case () of
-    _ | isVer6 8  -> return V6_8
-      | isVer6 10 -> return V6_10
-      | isVer6 12 -> return V6_12
-      | otherwise -> fail $ "Failed to identify GHC from: " ++ show verStr
+identifyGhcPkg :: Verbosity -> IO Version
+identifyGhcPkg vb =
+    do verStr <- rawSystemStdout vb "ghc-pkg" ["--version"]
+       case parseVer verStr of
+         []  -> fail $ "Failed to identify GHC from: " ++ show verStr
+         [v] -> return v
+    where
+      parseVer s = do
+        suff        <- maybeToList $ dropPrefix "GHC package manager version " s
+        (ver, "\n") <- readP_to_S parseVersion suff
+        return ver
 
--- |Generate a ghc-pkg 6 version string prefix
-ghcPkg6Ident :: Int -> String
-ghcPkg6Ident v = "GHC package manager version 6." ++ show v ++ "."
+dropCommonPrefix ::  Eq a => [a] -> [a] -> ([a], [a])
+dropCommonPrefix (x:xs) (y:ys) | x == y = dropCommonPrefix xs ys
+dropCommonPrefix xs ys = (xs, ys)
 
--- |Does the provided string look like a ghc-pkg version string?
-isGHCPkg6 :: Int -> String -> Bool
-isGHCPkg6 v = (ghcPkg6Ident v `isPrefixOf`)
+dropPrefix :: Eq a => [a] -- ^ Prefix
+           -> [a] -- ^ String to check
+           -> Maybe [a] -- ^ If the prefix fully matched, then Just the suffix
+dropPrefix pfx s = case dropCommonPrefix pfx s of
+                     ([], suff) -> Just suff
+                     _          -> Nothing
 
 -- |Get the ghc-pkg filename and the appropriate procedure for
 -- initializing a ghc package database for this version
 --
 -- XXX: this is duplicated in Distribution.Dev.InitPkgDb
-ghcPkgSettings :: GHCVer -> (FilePath, Verbosity -> FilePath -> IO ())
-ghcPkgSettings V6_8 = ("packages-6.8.conf", fileBased)
-ghcPkgSettings V6_10 = ("packages-6.10.conf", fileBased)
-ghcPkgSettings V6_12 = ("packages.conf.d", ghcPkgInit)
+ghcPkgSettings :: Version -> (FilePath, Verbosity -> FilePath -> IO ())
+ghcPkgSettings v = ("packages-" ++ showVersion v ++ ".conf", pkgType)
+    where
+      pkgType | canUseGhcPkg v  = ghcPkgInit
+              | isFileBased v = fileBased
+              | otherwise = error $ "Don't know how to initialize the\ 
+                                    \ package database for GHC " ++
+                                    showVersion v
+
+isFileBased :: Version -> Bool
+isFileBased v = v >= mkVer [6,8] && v < mkVer [6,11]
+
+canUseGhcPkg :: Version -> Bool
+canUseGhcPkg v = v >= mkVer [6,12]
+
+needsWrapper :: Version -> Bool
+needsWrapper v = v >= mkVer [6,8] && v < mkVer [6, 9]
 
 -- |Call ghc-pkg init (GHC >= 6.12)
 ghcPkgInit :: Verbosity -> FilePath -> IO ()
@@ -137,19 +155,20 @@ fileBased _ pkgLoc = do
   extant <- doesFileExist pkgLoc
   unless extant $ writeFile pkgLoc "[]"
 
+mkVer :: [Int] -> Version
+mkVer xs = Version xs []
+
 ---------------------------------------------------------------
 -- Invoking cabal with the correct arguments to use the sandbox
 
 -- |Get the command-line arguments that we need to supply to
 -- cabal-install in order to use the sandbox to download packages and
 -- install depenencies
-getCabalArgs :: Verbosity -> FilePath -> FilePath -> GHCVer -> IO [String]
+getCabalArgs :: Verbosity -> FilePath -> FilePath -> Version -> IO [String]
 getCabalArgs vb sandbox cfgFile v = (cfgFileArg:) `fmap` extraArgs
     where
       cfgFileArg = "--config-file=" ++ cfgFile
-      extraArgs = case v of
-                    V6_8 -> v68Args
-                    _    -> return []
+      extraArgs = if needsWrapper v then v68Args else return []
 
       v68Args = do
         -- Build ghc-pkg-6_8-compat by itself. It has no build

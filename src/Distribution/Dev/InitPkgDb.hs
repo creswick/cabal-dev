@@ -36,8 +36,8 @@ initPkgDb v s = do
       run     = rawSystemProgram
 
   ghcPkg <- fst `fmap` require ghcPkgProgram
-  let typ = ghcPackageDbType ghcPkg
-      s' = setVersion s typ
+  let (ver, typ) = ghcPackageDbType ghcPkg
+      s' = setVersion s typ ver
       pth = pkgConf s'
 
   case typ of
@@ -49,12 +49,16 @@ initPkgDb v s = do
       unless e $ writeFile pth "[]"
   return s'
 
-ghcPackageDbType :: ConfiguredProgram -> PackageDbType
+ghcPackageDbType :: ConfiguredProgram -> (Version, PackageDbType)
 ghcPackageDbType p =
-    case programVersion p of
+    case res of
       Nothing -> error "Unknown ghc version!"
-      Just v | v < Version [6, 10] [] -> GHC_6_8_Db $
-                                         locationPath $
-                                         programLocation p
-             | v < Version [6, 12] [] -> GHC_6_10_Db
-             | otherwise              -> GHC_6_12_Db
+      Just v  -> v
+    where
+      res = do
+        v <- programVersion p
+        let typ | v < Version [6, 10] [] = GHC_6_8_Db $ locationPath $
+                                           programLocation p
+                | v < Version [6, 12] [] = GHC_6_10_Db
+                | otherwise              = GHC_6_12_Db
+        return (v, typ)
