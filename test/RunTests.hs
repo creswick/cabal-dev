@@ -282,15 +282,15 @@ assertLogLocationOk v cabalDev =
             let logsPth = sandbox sb </> "logs"
             let lsMsg msg = do
                   putStrLn msg
-                  rawSystem "ls" ["-ld", logsPth]
+                  _ <- rawSystem "ls" ["-ld", logsPth]
                   return ()
             let withCabalDev f aa = do
                   f cabalDev (["-s", sandbox sb] ++ aa)
 
-            act logsPth
+            _ <- act logsPth
             lsMsg "BEFORE"
-            withCabalDev assertExitsSuccess ["add-source", packageDir]
-            withCabalDev expectation ["install", pkgStr]
+            _ <- withCabalDev assertExitsSuccess ["add-source", packageDir]
+            _ <- withCabalDev expectation ["install", pkgStr]
             lsMsg "AFTER"
 
 -- A human-readable package index dump

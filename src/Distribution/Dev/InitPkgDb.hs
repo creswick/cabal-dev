@@ -12,8 +12,10 @@ import Distribution.Simple.Program ( ghcPkgProgram, requireProgram
                                    )
 import Distribution.Version ( Version(..) )
 import Distribution.Verbosity ( Verbosity )
+import Distribution.Simple.Utils ( info )
 
 import Distribution.Simple.Program ( rawSystemProgram, emptyProgramConfiguration )
+import Distribution.Text ( display )
 
 import System.Directory ( doesFileExist, doesDirectoryExist )
 
@@ -47,6 +49,12 @@ initPkgDb v s = do
     _ -> do
       e <- doesFileExist pth
       unless e $ writeFile pth "[]"
+
+  info v $ "Using ghc-pkg " ++ display ver ++
+       case typ of
+         GHC_6_8_Db _ -> " wrapper"
+         _ -> ""
+
   return s'
 
 ghcPackageDbType :: ConfiguredProgram -> (Version, PackageDbType)

@@ -106,7 +106,7 @@ extraArgs v cfg pdb =
 -- XXX: this is very imprecise. Right now, we require a specific
 -- version of Cabal, so this is ok (and is equivalent to True)
 needsGHC68Compat :: Bool
-needsGHC68Compat = cabalVersion < Version [1, 8] []
+needsGHC68Compat = cabalVersion < Version [1, 9] []
 
 ghcPkgCompatProgram :: Program
 ghcPkgCompatProgram  = p { programFindLocation =
