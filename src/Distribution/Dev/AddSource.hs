@@ -54,7 +54,7 @@ import System.FilePath                       ( takeExtension, takeBaseName
                                              , splitExtension
                                              )
 import System.IO                             ( withFile, IOMode(..), hClose
-                                             , openTempFile
+                                             , openTempFile, hFlush
                                              )
 import System.IO.Error                       ( isDoesNotExistError )
 
