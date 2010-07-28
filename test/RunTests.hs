@@ -1,3 +1,5 @@
+import qualified Codec.Archive.Tar as Tar
+import qualified Data.ByteString.Lazy.Char8 as L
 import Control.Applicative ( (<$>), (<*>), pure )
 import Control.Monad ( replicateM, when )
 import Control.Monad.Random ( Rand, getRandomR, evalRandIO )
@@ -26,13 +28,13 @@ import Distribution.Text ( simpleParse, display )
 import Distribution.Verbosity ( normal, Verbosity, showForCabal, verbose )
 import Distribution.Version ( Version(..) )
 import Distribution.Dev.InitPkgDb ( initPkgDb )
-import Distribution.Dev.Sandbox ( newSandbox, pkgConf, Sandbox, KnownVersion, sandbox )
+import Distribution.Dev.Sandbox ( newSandbox, pkgConf, Sandbox, KnownVersion, sandbox, indexTar )
 import System.Cmd ( rawSystem )
 import System.Process ( readProcessWithExitCode )
 import System.Directory ( getTemporaryDirectory, createDirectory )
 import System.Environment ( getArgs )
 import System.Exit ( ExitCode(ExitSuccess) )
-import System.FilePath ( (</>), (<.>) )
+import System.FilePath ( (</>), (<.>), takeExtension )
 import System.Random ( RandomGen )
 import Test.Framework ( defaultMainWithArgs, Test, testGroup )
 import Test.Framework.Providers.HUnit ( testCase )
@@ -51,11 +53,13 @@ tests p =
     [ testGroup "Basic invocation tests" $ testBasicInvocation p
     , testGroup "Sandboxed" $
       [ testCase "add-source stays sandboxed (no-space dir)" $
-        addSourceStaysSandboxed normal p "fake-package.",
-        testCase "add-source stays sandboxed (dir with spaces)" $
-        addSourceStaysSandboxed verbose p "fake package."
+        addSourceStaysSandboxed normal p "fake-package."
+      , testCase "add-source stays sandboxed (dir with spaces)" $
+        addSourceStaysSandboxed normal p "fake package."
       , testCase "Builds ok regardless of the state of the logs directory" $
         assertLogLocationOk normal p
+      , testCase "Index tar files contain all contents" $
+        assertTarFileOk normal p
       ]
     , testGroup "Parsing and serializing" $
       [ testCase "simple round-trip test" $
@@ -272,6 +276,28 @@ assertLogLocationOk v cabalDev =
             _ <- withCabalDev assertExitsSuccess ["add-source", packageDir]
             _ <- withCabalDev expectation ["install", pkgStr]
             lsMsg "AFTER"
+
+assertTarFileOk :: Verbosity -> FilePath -> HUnit.Assertion
+assertTarFileOk v cabalDev =
+    withTempPackage v "check-tar-file." $ \_ packageDir sb pId -> do
+      let withCabalDev f aa = do
+            f cabalDev (["-s", sandbox sb] ++ aa)
+      _ <- withCabalDev assertExitsSuccess ["add-source", packageDir]
+      entries <- Tar.read `fmap` L.readFile (indexTar sb)
+      let selectCabalFile _ m@(Just _) = m
+          selectCabalFile e Nothing = do
+            case Tar.entryContent e of
+              Tar.NormalFile b _ | isCabalFile e -> Just $ L.unpack b
+              _                                  -> Nothing
+          isCabalFile e = takeExtension (Tar.entryPath e) == ".cabal"
+          c = Tar.foldEntries selectCabalFile Nothing (const Nothing) entries
+      case c of
+        Nothing        -> HUnit.assertFailure "Failed to find a cabal file"
+        Just extracted ->
+            do let baseCabalName = display (packageName pId) <.> "cabal"
+               original <- readFile $ packageDir </> baseCabalName
+               HUnit.assertEqual
+                        "Cabal files before and after tarring" original extracted
 
 ----------------------------------------------------------------
 -- Utility code for testing sandboxing
