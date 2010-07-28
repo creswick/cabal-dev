@@ -53,8 +53,8 @@ import System.FilePath                       ( takeExtension, takeBaseName
                                              , splitDirectories, (<.>), (</>)
                                              , splitExtension
                                              )
-import System.IO                             ( withFile, IOMode(..), hClose
-                                             , openTempFile, hFlush
+import System.IO                             ( withBinaryFile, IOMode(..), hClose
+                                             , openTempFile, hFlush, hSetBinaryMode
                                              )
 import System.IO.Error                       ( isDoesNotExistError )
 
@@ -120,6 +120,7 @@ writeIndex :: Sandbox a -- ^The local repository path
            -> IO ()
 writeIndex sandbox ents =
     do newIndexName <- withTmpIndex $ \(fn, h) -> do
+                         hSetBinaryMode h True
                          L.hPut h (T.write ents)
                          hFlush h
                          return fn
@@ -153,7 +154,7 @@ readExistingIndex sandbox =
         then return $ Right []
         else ioError e
     where
-      readIndexFile = withFile (indexTar sandbox) ReadMode
+      readIndexFile = withBinaryFile (indexTar sandbox) ReadMode $
                       (forceEntries . T.read <=< L.hGetContents)
       forceEntries es =
         let step _ l@(Left _) = l
@@ -248,7 +249,7 @@ processLocalSource v fn =
 processTarball :: FilePath
                -> IO (Either String (PackageIdentifier, L.ByteString))
 processTarball fn =
-    withFile fn ReadMode $ \h ->
+    withBinaryFile fn ReadMode $ \h ->
         do ents <- T.read . Z.decompress <$> L.hGetContents h
            case extractCabalFile ents of
              Nothing -> return $ Left "No cabal file found"
@@ -298,7 +299,7 @@ processDirectory v d = go `catch` \e ->
         if mkPackageName (takeBaseName c) == pkgName pkgId
           then do
             notice v $ "Building source dist at " ++ d ++ " for " ++ display pkgId
-            cabalFile <- withFile fn ReadMode $
+            cabalFile <- withBinaryFile fn ReadMode $
                          forcedBS <=< L.hGetContents
             return $ Right (pkgId, cabalFile)
           else
