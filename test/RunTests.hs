@@ -29,6 +29,7 @@ import Distribution.Verbosity ( normal, Verbosity, showForCabal, verbose )
 import Distribution.Version ( Version(..) )
 import Distribution.Dev.InitPkgDb ( initPkgDb )
 import Distribution.Dev.Sandbox ( newSandbox, pkgConf, Sandbox, KnownVersion, sandbox, indexTar )
+import System.IO ( withFile, IOMode(ReadMode) )
 import System.Cmd ( rawSystem )
 import System.Process ( readProcessWithExitCode )
 import System.Directory ( getTemporaryDirectory, createDirectory )
@@ -283,21 +284,23 @@ assertTarFileOk v cabalDev =
       let withCabalDev f aa = do
             f cabalDev (["-s", sandbox sb] ++ aa)
       _ <- withCabalDev assertExitsSuccess ["add-source", packageDir]
-      entries <- Tar.read `fmap` L.readFile (indexTar sb)
-      let selectCabalFile _ m@(Just _) = m
-          selectCabalFile e Nothing = do
-            case Tar.entryContent e of
-              Tar.NormalFile b _ | isCabalFile e -> Just $ L.unpack b
-              _                                  -> Nothing
-          isCabalFile e = takeExtension (Tar.entryPath e) == ".cabal"
-          c = Tar.foldEntries selectCabalFile Nothing (const Nothing) entries
-      case c of
-        Nothing        -> HUnit.assertFailure "Failed to find a cabal file"
-        Just extracted ->
-            do let baseCabalName = display (packageName pId) <.> "cabal"
-               original <- readFile $ packageDir </> baseCabalName
-               HUnit.assertEqual
-                        "Cabal files before and after tarring" original extracted
+      withFile (indexTar sb) ReadMode $ \h -> do
+        entries <- Tar.read `fmap` L.hGetContents h
+        let selectCabalFile _ m@(Just _) = m
+            selectCabalFile e Nothing = do
+              case Tar.entryContent e of
+                Tar.NormalFile b _ | isCabalFile e -> Just b
+                _                                  -> Nothing
+            isCabalFile e = takeExtension (Tar.entryPath e) == ".cabal"
+        let c = Tar.foldEntries selectCabalFile Nothing (const Nothing) entries
+        case c of
+          Nothing        -> HUnit.assertFailure "Failed to find a cabal file"
+          Just extracted ->
+              let baseCabalName = display (packageName pId) <.> "cabal"
+              in  withFile (packageDir </> baseCabalName) ReadMode $ \h1 ->
+                  do original <- L.hGetContents h1
+                     HUnit.assertEqual "Cabal files before and after tarring"
+                          original extracted
 
 ----------------------------------------------------------------
 -- Utility code for testing sandboxing
