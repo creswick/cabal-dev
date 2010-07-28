@@ -21,13 +21,14 @@ import Distribution.Simple.PackageIndex ( lookupSourcePackageId, allPackages
                                         , PackageIndex
                                         )
 import Distribution.InstalledPackageInfo ( installedPackageId )
-import Distribution.Simple.Utils ( rawSystemStdout, withTempDirectory, info )
+import Distribution.Simple.Utils ( withTempDirectory, info )
 import Distribution.Text ( simpleParse, display )
-import Distribution.Verbosity ( normal, Verbosity, showForCabal )
+import Distribution.Verbosity ( normal, Verbosity, showForCabal, verbose )
 import Distribution.Version ( Version(..) )
 import Distribution.Dev.InitPkgDb ( initPkgDb )
 import Distribution.Dev.Sandbox ( newSandbox, pkgConf, Sandbox, KnownVersion, sandbox )
 import System.Cmd ( rawSystem )
+import System.Process ( readProcessWithExitCode )
 import System.Directory ( getTemporaryDirectory, createDirectory )
 import System.Environment ( getArgs )
 import System.Exit ( ExitCode(ExitSuccess) )
@@ -74,8 +75,7 @@ testBasicInvocation p =
       assertExitsSuccess p ["--version"]
 
     , testCase "--numeric-version has parseable output" $
-      assertProgramOutput p ["--numeric-version"] $
-      either fail return . checkNumericVersion
+      assertProgramOutput checkNumericVersion p ["--numeric-version"]
 
     , testCase "exits with failure when no arguments are supplied" $
       assertExitsFailure p []
@@ -94,132 +94,105 @@ main = do
 
   defaultMainWithArgs (tests cabalDev) testFrameworkArgs
 
--- configEcho :: HUnit.Assertion
--- configEcho = putStrLn $ showConfig sampleConfig
-
-sampleConfig :: SavedConfig
-sampleConfig = mempty { savedGlobalFlags = mempty { globalLocalRepos = ["/home/cre swick"]
-                                                  , globalCacheDir = toFlag "/home/creswick/cabal files/cache/"}
-                      , savedUserInstallDirs = mempty { prefix = toFlag $ toPathTemplate "/home/creswick/cabal files"
-                                                      , bindir = toFlag $ toPathTemplate "/home/creswick/cabal files/some/bin" }
-                      , savedConfigureFlags = mempty { configPackageDB = toFlag $
-                                                           SpecificPackageDB "/home/creswick/cabal files/package.db"}
-                      }
-
+-- |Test that parsing and serializing a cabal-install SavedConfig with
+-- spaces in the paths preserves the spaces properly.
+--
+-- This tests only a select few of the fields and leaves the rest
+-- empty. In practice, this has proven to be adequate.
+--
+-- This is really just testing that cabal-install is capable of
+-- handling these fields. We have baked in knowledge of the syntax
+-- that these fields need into RewriteCabalConfig. Ideally,
+-- RewriteCabalConfig would read/write the data structure using the
+-- code from cabal-install. We haven't done that because pulling in
+-- all of the code from cabal-install into a production build is
+-- pretty hackish. I think that cabal-dev ought to be a fork or
+-- alternate build of cabal-install.
+--
+-- Note that this test is the whole reason that we have the custom
+-- build type.
 assertRoundTrip :: HUnit.Assertion
-assertRoundTrip = do
-  isEqual sampleConfig =<< roundTrip sampleConfig
-  where roundTrip conf = case parseConfig mempty $ showConfig conf of
-          ParseFailed err -> fail $ "Parse failed: "++show err
-          ParseOk _ val   -> return val
+assertRoundTrip =
+    do parsed <- case parseConfig mempty $ showConfig configWithSpaces of
+                   ParseFailed err -> fail $ "Parse failed: " ++ show err
+                   ParseOk _ val   -> return val
 
-isEqual :: SavedConfig -> SavedConfig -> HUnit.Assertion
-isEqual a b = do let check msg f = (HUnit.assertEqual msg `on` f) a b
-                 check "globalLocalRepos" (globalLocalRepos . savedGlobalFlags)
-                 check "prefix" (show . prefix . savedUserInstallDirs)
-                 check "bindir" (show . bindir . savedUserInstallDirs)
-                 check "packageDB" (configPackageDB . savedConfigureFlags)
-                 check "cache" (globalCacheDir . savedGlobalFlags)
+       let check msg f =
+               (HUnit.assertEqual msg `on` f) parsed configWithSpaces
 
-assertProgramOutput :: FilePath -> [String] -> (String -> HUnit.Assertion)
+       check "globalLocalRepos" (globalLocalRepos . savedGlobalFlags)
+       check "cache" (globalCacheDir . savedGlobalFlags)
+       check "prefix" (show . prefix . savedUserInstallDirs)
+       check "bindir" (show . bindir . savedUserInstallDirs)
+       check "packageDB" (configPackageDB . savedConfigureFlags)
+    where
+      configWithSpaces =
+          mempty { savedGlobalFlags =
+                   mempty { globalLocalRepos = [pfx "repos"]
+                          , globalCacheDir = toFlag $ pfx "cache"
+                          }
+                 , savedUserInstallDirs =
+                   mempty { prefix = toFlag $ toPathTemplate $ pfx ""
+                          , bindir = toFlag $ toPathTemplate $ pfx "binaries"
+                          }
+                 , savedConfigureFlags =
+                   mempty { configPackageDB =
+                            toFlag $ SpecificPackageDB $ pfx "package.db"
+                          }
+                 }
+
+      pfx = ("/path with spaces" </>)
+
+
+assertProgramOutput :: (String -> Bool) -> FilePath -> [String]
                     -> HUnit.Assertion
-assertProgramOutput progPath progArgs check =
-    check =<< rawSystemStdout normal progPath progArgs
+assertProgramOutput f = assertProgram "has proper output" $
+                        \(c, s, _) -> (c == ExitSuccess) && f s
 
 assertExitsSuccess :: FilePath -> [String] -> HUnit.Assertion
-assertExitsSuccess = assertExitStatus (== ExitSuccess)
+assertExitsSuccess = assertProgram "exits successfully" $
+                     (ExitSuccess ==) . fst3
 
 assertExitsFailure :: FilePath -> [String] -> HUnit.Assertion
-assertExitsFailure = assertExitStatus (/= ExitSuccess)
+assertExitsFailure = assertProgram "exits with failure" $
+                     (ExitSuccess /=) . fst3
+
+fst3 :: (a, b, c) -> a
+fst3 (x, _, _) = x
 
 -- XXX: Still dumps output to the terminal
-assertExitStatus :: (ExitCode -> Bool) -> FilePath -> [String]
-                 -> HUnit.Assertion
-assertExitStatus f p args = HUnit.assert . f =<< rawSystem p args
+assertProgram :: String -> ((ExitCode, String, String) -> Bool) -> FilePath -> [String]
+              -> HUnit.Assertion
+assertProgram desc f progPath progArgs = do
+  res <- readProcessWithExitCode progPath progArgs ""
+  let msg = concat [ desc
+                   , " failed for "
+                   , progPath
+                   , " "
+                   , show progArgs
+                   , ": "
+                   , show res
+                   ]
+  HUnit.assertBool msg $ f res
 
--- Check that this string contains a numeric version
-checkNumericVersion :: String -> Either String ()
-checkNumericVersion s =
-    case lines s of
-      [l] -> case simpleParse l of
-               Just v  -> let _ = v :: Version
-                          in Right ()
-               Nothing -> Left $ "Failed to parse version string: " ++ show l
-      _   -> Left $ "Expected exactly one line. got: " ++ show s
-
--- Generate a minimal cabal file for a given package identifier
-genCabalFile :: PackageIdentifier -> String
-genCabalFile pId =
-    unlines
-    [ "Name:                " ++ display (pkgName pId)
-    , "Version:             " ++ display (pkgVersion pId)
-    , "Build-type:          Simple"
-    , "Cabal-version:       >=1.2"
-    , "Maintainer: nobody"
-    , "Description: This package contains no source code, and only enough in\
-      \ the Cabal file to make it buildable"
-    , "Category: Testing"
-    , "License: BSD3"
-    , "Synopsis: The most minimal package that will build"
-    , "Library"
-    , "  build-depends: base"
-    ]
-
--- |Generate a random Cabal package identifier
-mkRandomPkgId :: RandomGen g => Rand g PackageIdentifier
-mkRandomPkgId = PackageIdentifier <$> getRandomName <*> getRandomVersion
-    where
-      getRandomVersion = Version <$> getRandomBranch <*> pure tags
-          where tags = []
-
-      -- A branch is a version number
-      getRandomBranch = do
-       n <- getRandomR (1, 5)
-       replicateM n $ getRandomR (0, 5000)
-
-      getRandomName = do
-        i <- getRandomR (1, 5)
-        segs <- replicateM i getRandomSegment
-        return $ PackageName $ intercalate "-" segs
-
-      -- A Cabal package name segment must be at least one character
-      -- long, consist of alphanumeric characters, and contain at
-      -- least one letter.
-      getRandomSegment = do
-        aChar <- getRandomChar pkgLetter
-        before <- getRandomStr pkgChar 10
-        after <- getRandomStr pkgChar 10
-        return $ before ++ [aChar] ++ after
-
-      -- Given a predicate, select a random character from the first
-      -- 256 characters that satsifies that predicate. An exception
-      -- will be raised if no character matches the predicate.
-      getRandomChar p = do
-        let rng = filter p ['\0'..'\255']
-        i <- getRandomR (0, length rng - 1)
-        return $ rng !! i
-
-      -- Get a random string of characters that match the predicate p
-      -- of length [0..n]
-      getRandomStr p n = do
-        i <- getRandomR (0, n)
-        replicateM i $ getRandomChar p
-
-      pkgLetter c = isAscii c && isLetter c
-
-      pkgChar c = isAscii c && isAlphaNum c
-
-addSourceStaysSandboxed :: Verbosity -> FilePath -> FilePath -> HUnit.Assertion
+-- |Check that cabal-dev add-source makes a package installable by
+-- cabal-dev and that cabal-dev install for that package afterwards
+-- makes it available in the sandbox, but not outside.
+addSourceStaysSandboxed :: Verbosity -> FilePath -> FilePath
+                        -> HUnit.Assertion
 addSourceStaysSandboxed v cabalDev dirName =
     withTempPackage v dirName $ \readPackageIndex packageDir sb pId -> do
       let pkgStr = display pId
       sbPkgs <- readPackageIndex (privateStack sb)
       gPkgs <- readPackageIndex globalStack
+
       -- XXX: Cabal returns a single "empty" package if you try to
-      -- read an empty package db
+      -- read an empty package db, so we remove any package that has
+      -- an empty name before comparing
       let s = filter ((/= "") . display) .
               map installedPackageId .
               allPackages
+
       HUnit.assertEqual
                "Newly created package index should be empty"
                (s gPkgs) (s sbPkgs)
@@ -263,6 +236,13 @@ addSourceStaysSandboxed v cabalDev dirName =
 
       globalStack = [GlobalPackageDB]
 
+-- |Test that the existence or non-existence of the logs directory
+-- does not cause build failures.
+--
+-- Before this test, we had a bug that derived from
+-- System.Directory.canonicalizePath behaving differently depending on
+-- the state of the filesystem. This test tickled the bug, and now we
+-- are not using canonicalizePath.
 assertLogLocationOk :: Verbosity -> FilePath -> HUnit.Assertion
 assertLogLocationOk v cabalDev =
     mapM_ setupLogs
@@ -280,10 +260,11 @@ assertLogLocationOk v cabalDev =
           withTempPackage v "check-build-log." $ \_ packageDir sb pId -> do
             let pkgStr = display pId
             let logsPth = sandbox sb </> "logs"
-            let lsMsg msg = do
-                  putStrLn msg
-                  _ <- rawSystem "ls" ["-ld", logsPth]
-                  return ()
+            let lsMsg msg =
+                    when (v >= verbose) $ do
+                      putStrLn msg
+                      _ <- rawSystem "ls" ["-ld", logsPth]
+                      return ()
             let withCabalDev f aa = do
                   f cabalDev (["-s", sandbox sb] ++ aa)
 
@@ -292,6 +273,93 @@ assertLogLocationOk v cabalDev =
             _ <- withCabalDev assertExitsSuccess ["add-source", packageDir]
             _ <- withCabalDev expectation ["install", pkgStr]
             lsMsg "AFTER"
+
+----------------------------------------------------------------
+-- Utility code for testing sandboxing
+
+-- Check that this string contains a numeric version
+checkNumericVersion :: String -> Bool
+checkNumericVersion s =
+    case lines s of
+      [l] -> case simpleParse l of
+               Just v  -> let _ = v :: Version
+                          in True
+               Nothing -> False
+      _   -> False
+
+-- |Generate a minimal cabal file for a given package identifier
+--
+-- This Cabal file is useful for testing whether cabal-install can
+-- install things, and what the side-effects of installing a package
+-- are. Note that there are many side-effects that are not invoked by
+-- this package, however!
+genCabalFile :: PackageIdentifier -> String
+genCabalFile pId =
+    unlines
+    [ "Name:                " ++ display (pkgName pId)
+    , "Version:             " ++ display (pkgVersion pId)
+    , "Build-type:          Simple"
+    , "Cabal-version:       >=1.2"
+    , "Maintainer: nobody"
+    , "Description: This package contains no source code, and only enough in\
+      \ the Cabal file to make it buildable"
+    , "Category: Testing"
+    , "License: BSD3"
+    , "Synopsis: The most minimal package that will build"
+    , "Library"
+    , "  build-depends: base"
+    ]
+
+-- |Generate a random Cabal package identifier
+--
+-- XXX: If the package identifier is over a certain size, then
+-- cabal-install will fail because a filename is "too long." It's
+-- unclear what this limit is, but this function has been tweaked to
+-- generate a shorter name. There is still a big enough range of
+-- values that it should be pretty easy to find a name that doesn't
+-- conflict with something else, though.
+mkRandomPkgId :: RandomGen g => Rand g PackageIdentifier
+mkRandomPkgId = PackageIdentifier <$> getRandomName <*> getRandomVersion
+    where
+      getRandomVersion = Version <$> getRandomBranch <*> pure tags
+          where tags = []
+
+      -- A branch is a version number
+      getRandomBranch = do
+       n <- getRandomR (1, 4)
+       replicateM n $ getRandomR (0, 100)
+
+      getRandomName = do
+        i <- getRandomR (1, 5)
+        segs <- replicateM i getRandomSegment
+        return $ PackageName $ intercalate "-" segs
+
+      -- A Cabal package name segment must be at least one character
+      -- long, consist of alphanumeric characters, and contain at
+      -- least one letter.
+      getRandomSegment = do
+        aChar <- getRandomChar pkgLetter
+        before <- getRandomStr pkgChar 5
+        after <- getRandomStr pkgChar 5
+        return $ before ++ [aChar] ++ after
+
+      -- Given a predicate, select a random character from the first
+      -- 256 characters that satsifies that predicate. An exception
+      -- will be raised if no character matches the predicate.
+      getRandomChar p = do
+        let rng = filter p ['\0'..'\255']
+        i <- getRandomR (0, length rng - 1)
+        return $ rng !! i
+
+      -- Get a random string of characters that match the predicate p
+      -- of length [0..n]
+      getRandomStr p n = do
+        i <- getRandomR (0, n)
+        replicateM i $ getRandomChar p
+
+      pkgLetter c = isAscii c && isLetter c
+
+      pkgChar c = isAscii c && isAlphaNum c
 
 -- A human-readable package index dump
 dumpIndex :: PackageIndex -> String
@@ -312,7 +380,7 @@ configurePrerequisites v =
                     , ghcProgram
                     ]
 
--- The package dbs that we do not want to pollute
+-- A package db stack that includes only shared package databases
 sharedStack :: [PackageDB]
 sharedStack = [GlobalPackageDB, UserPackageDB]
 
@@ -335,12 +403,14 @@ findUnusedPackageId v pkgIdx = go []
                      return pId
           _    -> go (pId:ps)
 
+-- |Create a dummy Cabal package in a temporary directory and invoke a
+-- function with the state dependent on the temporary directory.
 withTempPackage
     :: Verbosity -> String
     -> (([PackageDB] -> IO PackageIndex)
         -> FilePath
-        -> Sandbox KnownVersion -> PackageIdentifier -> HUnit.Assertion)
-    -> HUnit.Assertion
+        -> Sandbox KnownVersion -> PackageIdentifier -> IO a)
+    -> IO a
 withTempPackage v dirName f =
     do pConf <- configurePrerequisites v
        let readPackageIndex stack = getInstalledPackages v stack pConf
@@ -359,7 +429,11 @@ withTempPackage v dirName f =
          let packageDir = d </> "pkg"
          let cabalFileName = packageDir </> display (pkgName pId) <.> "cabal"
          createDirectory packageDir
-         writeFile cabalFileName $ genCabalFile pId
+         writeFile cabalFileName (genCabalFile pId)
+         info v $ unlines [ "Generated cabal file:"
+                          ,  genCabalFile pId
+                          ]
+         when (v >= verbose) $ rawSystem "ls" ["-l"] >> return ()
 
          sb <- initPkgDb v =<< newSandbox v sandboxDir
          f readPackageIndex packageDir sb pId
