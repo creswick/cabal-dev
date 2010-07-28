@@ -301,6 +301,8 @@ assertTarFileOk v cabalDev =
                   do original <- L.hGetContents h1
                      HUnit.assertEqual "Cabal files before and after tarring"
                           original extracted
+                     print (L.length original, L.length extracted)
+                     L.putStr original
 
 ----------------------------------------------------------------
 -- Utility code for testing sandboxing
