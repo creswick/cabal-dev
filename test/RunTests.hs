@@ -53,7 +53,7 @@ tests p =
       [ testCase "add-source stays sandboxed (no-space dir)" $
         addSourceStaysSandboxed normal p "fake-package.",
         testCase "add-source stays sandboxed (dir with spaces)" $
-        addSourceStaysSandboxed normal p "fake package."
+        addSourceStaysSandboxed verbose p "fake package."
       , testCase "Builds ok regardless of the state of the logs directory" $
         assertLogLocationOk normal p
       ]
@@ -160,7 +160,6 @@ assertExitsFailure = assertProgram "exits with failure" $
 fst3 :: (a, b, c) -> a
 fst3 (x, _, _) = x
 
--- XXX: Still dumps output to the terminal
 assertProgram :: String -> ((ExitCode, String, String) -> Bool) -> FilePath -> [String]
               -> HUnit.Assertion
 assertProgram desc f progPath progArgs = do
