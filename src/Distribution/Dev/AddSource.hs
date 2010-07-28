@@ -119,8 +119,10 @@ writeIndex :: Sandbox a -- ^The local repository path
            -> [T.Entry] -- ^The index entries
            -> IO ()
 writeIndex sandbox ents =
-    do newIndexName <- withTmpIndex $ \(fn, h) ->
-                       L.hPut h (T.write ents) >> return fn
+    do newIndexName <- withTmpIndex $ \(fn, h) -> do
+                         L.hPut h (T.write ents)
+                         hFlush h
+                         return fn
        renameFile newIndexName $ indexTar sandbox
     where
       pth = localRepoPath sandbox
