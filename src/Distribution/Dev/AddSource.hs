@@ -229,12 +229,7 @@ installTarball flgs sandbox src pkgId pkgDesc args =
                                     -- around a different bug in Cabal
                                     -- (http://hackage.haskell.org/trac/hackage/ticket/731)
                                     rawSystem "cabal" ["configure"]
-                                    res <- rawSystem "cabal" $ args ++ ["configure"]
-                                    case res of
-                                      ExitSuccess ->
-                                          do
-                                            rawSystem "dist/setup/setup" ["sdist"]
-                                      v -> return v
+                                    rawSystem "dist/setup/setup" ["sdist"]
                                   _ -> rawSystem "cabal" ["sdist"]
 
                     case cabalRes of
