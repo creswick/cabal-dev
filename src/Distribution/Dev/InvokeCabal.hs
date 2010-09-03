@@ -4,6 +4,7 @@ module Distribution.Dev.InvokeCabal
     , setup
     , extraArgs
     , cabalProgram
+    , cabalArgs
     )
 where
 
@@ -63,6 +64,12 @@ invokeCabal flgs args = do
     Right args' -> do
              invokeCabalCfg v $ args' ++ args
              return CommandOk
+
+cabalArgs :: Config -> IO (Either String [String])
+cabalArgs flgs = do
+  let v = getVerbosity flgs
+  s <- initPkgDb v =<< resolveSandbox flgs
+  setup s flgs
 
 setup :: Sandbox KnownVersion-> Config -> IO (Either String [String])
 setup s flgs = do

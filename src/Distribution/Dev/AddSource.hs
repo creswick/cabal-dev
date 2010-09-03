@@ -23,13 +23,16 @@ import Control.Monad                         ( guard, (<=<), forM_ )
 import Control.Monad.Error                   ( runErrorT, throwError )
 import Control.Monad.Trans                   ( liftIO )
 import Data.List                             ( isPrefixOf )
-import Distribution.PackageDescription       ( packageDescription, package )
+import Distribution.PackageDescription       ( PackageDescription(buildType), BuildType(Custom)
+                                             , packageDescription, package )
 import Distribution.Package                  ( PackageIdentifier(..) )
 #if MIN_VERSION_Cabal(1,6,0)
-import Distribution.PackageDescription.Parse ( readPackageDescription )
+import Distribution.PackageDescription.Parse ( ParseResult(ParseOk), readPackageDescription
+                                             , parsePackageDescription )
 import Distribution.Package                  ( PackageName(..) )
 #elif MIN_VERSION_Cabal(1,4,0)
-import Distribution.PackageDescription       ( readPackageDescription )
+import Distribution.PackageDescription       ( ParseResult(ParseOk), readPackageDescription
+                                             , parsePackageDescription )
 #else
 #error Unsupported Cabal version
 #endif
@@ -58,12 +61,14 @@ import System.IO                             ( withBinaryFile, IOMode(..), hClos
                                              )
 import System.IO.Error                       ( isDoesNotExistError )
 
-import qualified Codec.Archive.Tar       as T
-import qualified Codec.Archive.Tar.Entry as T
-import qualified Codec.Compression.GZip  as Z
-import qualified Data.ByteString.Lazy    as L
-import qualified Distribution.Verbosity  as V
+import qualified Codec.Archive.Tar           as T
+import qualified Codec.Archive.Tar.Entry     as T
+import qualified Codec.Compression.GZip      as Z
+import qualified Data.ByteString.Lazy        as L
+import qualified Data.ByteString.Lazy.Char8  as L8 ( unpack )
+import qualified Distribution.Verbosity      as V
 
+import Distribution.Dev.InvokeCabal ( cabalArgs )
 import Distribution.Dev.Command ( CommandActions(..), CommandResult(..) )
 import Distribution.Dev.Flags   ( Config, getVerbosity )
 import Distribution.Dev.Sandbox ( resolveSandbox, localRepoPath
@@ -87,32 +92,39 @@ addSources flgs fns = do
   let v = getVerbosity flgs
   debug v $ "Making a cabal repo in " ++ localRepoPath sandbox ++
             " out of " ++ show fns
-  results <- mapM (processLocalSource v) fns
-  let errs = [e | Left e <- results]
-      srcs = [s | Right s <- results]
-  if not $ null errs
-    then return $ CommandError $ unlines $
-             "Errors finding cabal files:":map (showString "  ") errs
-    else do
-      let (sources, newEntries) = unzip srcs
-      res <- readExistingIndex sandbox
-      case res of
-        Left err -> return $
-                    CommandError $ "Error reading existing index: " ++ err
-        Right existingIndex ->
-            do let newIndex = mergeIndices existingIndex newEntries
-               -- Now we have the new index ready and have sanity-checked
-               -- all of the package locations to be sure that they
-               -- contain a cabal package (or at least a .cabal file)
-               --
-               -- Now to install the tarballs for the directories:
-               forM_ sources $ \(src, pkgId) ->
-                   installTarball flgs sandbox src pkgId
+  eArgs <- cabalArgs flgs
+  case eArgs of
+    Left err -> return $ CommandError $ "Error getting cabal arguments: " ++ err
+    Right args ->
+        do
+          results <- mapM (processLocalSource v) fns
+          let errs = [e | Left e <- results]
+              srcs = [s | Right s <- results]
+          if not $ null errs
+            then return $ CommandError $ unlines $
+                     "Errors finding cabal files:":map (showString "  ") errs
+            else do
+              let (sources, newEntries) = unzip srcs
+              res <- readExistingIndex sandbox
+              case res of
+                Left err -> return $
+                            CommandError $ "Error reading existing index: " ++ err
+                Right existingIndex ->
+                    do let newIndex = mergeIndices existingIndex newEntries
+                       -- Now we have the new index ready and have
+                       -- sanity-checked all of the package locations
+                       -- to be sure that they contain a cabal package
+                       -- (or at least a .cabal file)
+                       --
+                       -- Now to install the tarballs for the
+                       -- directories:
+                       forM_ sources $ \(src, pkgId, pkgDesc) ->
+                           installTarball flgs sandbox src pkgId pkgDesc args
 
-               -- and now that the tarballs are in place, write out the
-               -- updated index
-               writeIndex sandbox newIndex
-               return CommandOk
+                       -- and now that the tarballs are in place,
+                       -- write out the updated index
+                       writeIndex sandbox newIndex
+                       return CommandOk
 
 -- |Atomically write an index tarball in the supplied directory
 writeIndex :: Sandbox a -- ^The local repository path
@@ -183,8 +195,10 @@ installTarball :: Config
                -> Sandbox a -- ^Location of the local repository
                -> LocalSource -- ^What kind of package source
                -> PackageIdentifier
+               -> PackageDescription -- ^Package description
+               -> [String] -- ^Cabal args, computed at the top level
                -> IO (Either String ())
-installTarball flgs sandbox src pkgId =
+installTarball flgs sandbox src pkgId pkgDesc args =
     do createDirectoryIfMissing True $ localRepoPath sandbox </> repoDir pkgId
        case src of
          TarPkg fn -> do copyFile fn dest
@@ -202,7 +216,21 @@ installTarball flgs sandbox src pkgId =
         debug (getVerbosity flgs) $ "Running cabal sdist in " ++ fn
         bracket getCurrentDirectory setCurrentDirectory $ \_ -> do
                     setCurrentDirectory fn
-                    cabalRes <- rawSystem "cabal" ["sdist"]
+                    -- If the build-type is custom, run 'configure'
+                    -- and invoke the generated setup program.
+                    -- Otherwise, just run plain sdist.  We do this to
+                    -- work around
+                    -- http://hackage.haskell.org/trac/hackage/ticket/410
+                    cabalRes <- case buildType pkgDesc of
+                                  Just Custom -> do
+                                    res <- rawSystem "cabal" $ args ++ ["configure"]
+                                    case res of
+                                      ExitSuccess ->
+                                          do
+                                            rawSystem "dist/setup/setup" ["sdist"]
+                                      v -> return v
+                                  _ -> rawSystem "cabal" ["sdist"]
+
                     case cabalRes of
                       ExitSuccess ->
                           do here <- getCurrentDirectory
@@ -226,7 +254,7 @@ downloadTarball u = do
 -- |Extract the index information from the supplied path, either as a
 -- tarball or as a local package directory
 processLocalSource :: V.Verbosity -> FilePath
-                   -> IO (Either String ((LocalSource, PackageIdentifier), T.Entry))
+                   -> IO (Either String ((LocalSource, PackageIdentifier, PackageDescription), T.Entry))
 processLocalSource v fn =
     runErrorT $ do
       let cls = classifyLocalSource fn
@@ -235,19 +263,19 @@ processLocalSource v fn =
                   liftIO $ notice v $ "Downloading " ++ show u
                   TarPkg `fmap` eitherErrorIO (downloadTarball u)
                Right s -> return s
-      (pkgId, c) <- eitherErrorIO $
+      (pkgId, c, pkgDesc) <- eitherErrorIO $
                     case src of
                       TarPkg x -> processTarball x
                       DirPkg x -> processDirectory v x
       ent <- eitherError $ toIndexEntry pkgId c
-      return ((src, pkgId), ent)
+      return ((src, pkgId, pkgDesc), ent)
     where
       eitherError = either throwError return
       eitherErrorIO = eitherError <=< liftIO
 
 -- |Extract the index information from a tarball
 processTarball :: FilePath
-               -> IO (Either String (PackageIdentifier, L.ByteString))
+               -> IO (Either String (PackageIdentifier, L.ByteString, PackageDescription))
 processTarball fn =
     withBinaryFile fn ReadMode $ \h ->
         do ents <- T.read . Z.decompress <$> L.hGetContents h
@@ -255,7 +283,9 @@ processTarball fn =
              Nothing -> return $ Left "No cabal file found"
 
              -- Force reading the cabal file before we exit withFile
-             Just res -> forceBS (snd res) >> return (Right res)
+             Just res@(_, bs, _) -> do
+               forceBS bs
+               return (Right res)
 
 #if MIN_VERSION_Cabal(1,6,0)
 mkPackageName :: String -> PackageName
@@ -276,7 +306,7 @@ displayPackageName = id
 -- |Extract the index information from a directory containing a cabal
 -- file
 processDirectory :: V.Verbosity -> FilePath
-                 -> IO (Either String (PackageIdentifier, L.ByteString))
+                 -> IO (Either String (PackageIdentifier, L.ByteString, PackageDescription))
 processDirectory v d = go `catch` \e ->
                      if expected e
                      then return $ Left $ show e
@@ -294,14 +324,15 @@ processDirectory v d = go `catch` \e ->
 
       processCabalFile c = do
         let fn = d </> c
-        pkgId <- package . packageDescription <$>
-                 readPackageDescription V.normal fn
+        pkgDesc <- packageDescription <$>
+                   readPackageDescription V.normal fn
+        let pkgId = package pkgDesc
         if mkPackageName (takeBaseName c) == pkgName pkgId
           then do
             notice v $ "Building source dist at " ++ d ++ " for " ++ display pkgId
             cabalFile <- withBinaryFile fn ReadMode $
                          forcedBS <=< L.hGetContents
-            return $ Right (pkgId, cabalFile)
+            return $ Right (pkgId, cabalFile, pkgDesc)
           else
             return $ Left $ unlines $
                        [ "Package name does not match cabal file name:"
@@ -319,11 +350,18 @@ forcedBS :: L.ByteString -> IO L.ByteString
 forcedBS bs = forceBS bs >> return bs
 
 -- |Extract a cabal file from a package tarball
-extractCabalFile :: T.Entries -> Maybe (PackageIdentifier, L.ByteString)
+extractCabalFile :: T.Entries -> Maybe (PackageIdentifier, L.ByteString, PackageDescription)
 extractCabalFile = T.foldEntries step Nothing (const Nothing)
     where
-      step ent Nothing = (,) <$> entPackageId ent <*> entBytes ent
+      step ent Nothing = (,,) <$> entPackageId ent <*> entBytes ent <*> (parseDesc $ entBytes ent)
       step _   ans     = ans
+
+      parseDesc bs = do
+        str <- L8.unpack <$> bs
+        let result = parsePackageDescription str
+        case result of
+          ParseOk _ pkg -> return $ packageDescription pkg
+          _ -> Nothing
 
       entPackageId ent =
           case splitDirectories $ T.entryPath ent of
