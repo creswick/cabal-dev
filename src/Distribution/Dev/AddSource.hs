@@ -223,11 +223,21 @@ installTarball flgs sandbox src pkgId pkgDesc args =
                     -- http://hackage.haskell.org/trac/hackage/ticket/410
                     cabalRes <- case buildType pkgDesc of
                                   Just Custom -> do
-                                    res <- rawSystem "cabal" $ args ++ ["configure"]
-                                    case res of
+                                    -- We run configure without args
+                                    -- first to compile the Setup
+                                    -- program.  We do this to work
+                                    -- around a different bug in Cabal
+                                    -- (http://hackage.haskell.org/trac/hackage/ticket/731)
+                                    res1 <- rawSystem "cabal" ["configure"]
+                                    case res1 of
                                       ExitSuccess ->
                                           do
-                                            rawSystem "dist/setup/setup" ["sdist"]
+                                            res2 <- rawSystem "cabal" $ args ++ ["configure"]
+                                            case res2 of
+                                              ExitSuccess ->
+                                                  do
+                                                    rawSystem "dist/setup/setup" ["sdist"]
+                                              v -> return v
                                       v -> return v
                                   _ -> rawSystem "cabal" ["sdist"]
 
