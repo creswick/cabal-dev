@@ -69,7 +69,8 @@ main = do
 
 -- The absolute path to the sandbox directory
 getSandbox :: IO FilePath
-getSandbox = canonicalizePath "cabal-dev"
+getSandbox = let path = "cabal-dev"
+             in catch (canonicalizePath path) (\_-> return path)
 
 ---------------------------------------------------------------------
 -- Identifying GHC version so that we know how to initialize and what
