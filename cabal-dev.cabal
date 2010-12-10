@@ -57,7 +57,7 @@ Executable ghc-pkg-6_8-compat
   Main-is: GhcPkgCompat.hs
   Build-Depends:
     base < 5,
-    Cabal >=1.2 && < 1.9
+    Cabal >=1.2 && < 1.11
 
   GHC-Options: -Wall
   HS-Source-Dirs: src
@@ -110,12 +110,12 @@ Executable cabal-dev
 
     Build-depends:
       bytestring >= 0.9 && < 0.10,
-      directory >= 1.0 && < 1.1,
-      filepath >= 1.1 && < 1.2,
-      Cabal >= 1.8.0.6 && < 1.9,
-      HTTP == 4000.0.9,
-      mtl >= 1.1 && < 1.2,
-      network >= 2.2 && < 2.3,
+      directory >= 1.0 && < 1.2,
+      filepath >= 1.1 && < 1.3,
+      Cabal >= 1.8.0.6 && < 1.11,
+      HTTP >= 4000.0.9 && < 4000.2,
+      mtl >= 1.1 && < 2.1,
+      network >= 2.2 && < 2.4,
       pretty >= 1.0 && < 1.1,
       process >= 1.0 && < 1.1,
       tar >= 0.3 && < 0.4,
