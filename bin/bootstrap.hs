@@ -70,7 +70,9 @@ main = do
 -- The absolute path to the sandbox directory
 getSandbox :: IO FilePath
 getSandbox = let path = "cabal-dev"
-             in catch (canonicalizePath path) (\_-> return path)
+                 handler = do cwd <- getCurrentDirectory
+                              return $ cwd </> path
+             in (canonicalizePath path) `catch` \_->handler
 
 ---------------------------------------------------------------------
 -- Identifying GHC version so that we know how to initialize and what
