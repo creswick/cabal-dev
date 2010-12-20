@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-runhaskell -isrc bin/bootstrap.hs --run-tests
+runhaskell -isrc admin/bootstrap.hs --run-tests

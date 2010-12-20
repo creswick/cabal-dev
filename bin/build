@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-runhaskell -isrc bin/bootstrap.hs "$@"
+runhaskell -isrc admin/bootstrap.hs "$@"
