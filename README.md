@@ -1,5 +1,5 @@
-= Cabal Dev
-== Motivation
+# Cabal Dev
+## Motivation
 
 Performing consistent builds is critical in software development, but
 the current system of per-user and per-system GHC package databases
@@ -9,7 +9,7 @@ necessary to enable one project to build may render another project
 inoperable.  If each project had a separate package database, each
 project could be built in a sandbox.
 
-== Usage
+## Usage
 
 Cabal-dev is simple to use:
 
@@ -34,7 +34,7 @@ commands that place the project's build artifacts in the cabal-dev
 sandbox, as well as leaving the binaries in the familiar `dist`
 directory.
 
-== Building with private dependencies
+## Building with private dependencies
 
 Cabal-dev also allows you to use un-released packages as though they
 were on hackage with `cabal-dev add-source`.
