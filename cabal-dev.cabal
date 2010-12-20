@@ -124,6 +124,9 @@ Executable cabal-dev
   if os(windows)
      build-depends: Win32 >= 2.1  && < 2.3
 
+  Build-tools:
+    cabal >= 0.8.2
+
   Other-modules:
     Distribution.Dev.AddSource,
     Distribution.Dev.Sandbox,
