@@ -1,7 +1,7 @@
 -- Bootstrap cabal-dev in a sandbox (not installing any dependencies in the
 -- user or global package databases)
 --
--- This script runs on GHC 6.8 - GHC 6.12.
+-- This script should run on GHC 6.8 - GHC 7.0.
 --
 -- Run in the root of this package with:
 -- @
