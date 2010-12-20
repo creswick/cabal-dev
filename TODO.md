@@ -11,5 +11,5 @@
    - multiple packages with one shared sandbox
    - flags specified on a per-package basis
  - release a library interface to cabal-dev for custom project build scripts
-
+ - Either use, or do not download/unpack the cabal-install source.
    

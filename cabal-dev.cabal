@@ -1,5 +1,5 @@
 Name:                cabal-dev
-Version:             0.7
+Version:             0.7.1
 Synopsis:            Manage sandboxed Haskell build environments
 
 Description:         cabal-dev is a tool for managing development builds of
@@ -31,13 +31,18 @@ License:             BSD3
 License-file:        LICENSE
 Author:              Josh Hoyt, Jonathan Daughtery, Rogan Creswick
 Maintainer:          j3h@galois.com, jtd@galois.com, creswick@galois.com
+Homepage:            https://github.com/creswick/cabal-dev
 Copyright:           2010 Galois, Inc.
 Category:            Development
 Build-type:          Custom
-Cabal-version:       >=1.2
+Cabal-version:       >=1.6
 Data-Files:
   admin/cabal-config.in,
   admin/00-index.tar
+
+source-repository head
+  type:        git
+  location:    git@github.com:creswick/cabal-dev.git
 
 Flag no-cabal-dev
   Description: Do not build cabal-dev (just build ghc-pkg-6_8-compat).
