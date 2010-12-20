@@ -29,8 +29,8 @@ Description:         cabal-dev is a tool for managing development builds of
 
 License:             BSD3
 License-file:        LICENSE
-Author:              Josh Hoyt
-Maintainer:          j3h@galois.com
+Author:              Josh Hoyt, Jonathan Daughtery, Rogan Creswick
+Maintainer:          j3h@galois.com, jtd@galois.com, creswick@galois.com
 Copyright:           2010 Galois, Inc.
 Category:            Development
 Build-type:          Custom
