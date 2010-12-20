@@ -13,8 +13,8 @@ project could be built in a sandbox.
 
 Cabal-dev is simple to use:
 
-: $ cd <cabalized project dir>
-: $ cabal-dev install
+    $ cd <cabalized project dir>
+    $ cabal-dev install
 
 Cabal-dev will create a default sandbox named `cabal-dev` in the
 current directory.  This will be populated with the project
@@ -43,11 +43,11 @@ For example, the `linux-ptrace` and `posix-waitpid` packages were only
 recently uploaded to hackage.  Previously, cabal-dev was used to build
 applications that depended on these two packages:
 
-: $ ls
-: linux-ptrace/  myProject/  posix-waitpid/
-: $ cd myProject
-: $ cabal-dev add-source ../linux-ptrace ../posix-waitpid
-: $ cabal-dev install
+    $ ls
+    linux-ptrace/  myProject/  posix-waitpid/
+    $ cd myProject
+    $ cabal-dev add-source ../linux-ptrace ../posix-waitpid
+    $ cabal-dev install
 
 Note that `cabal-dev add-source` accepts a list of source locations.
 
