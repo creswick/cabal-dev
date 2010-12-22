@@ -44,7 +44,9 @@ import Distribution.Dev.Sandbox            ( resolveSandbox
                                            , pkgConf
                                            , sandbox
                                            )
-import System.Directory ( canonicalizePath, getAppUserDataDirectory )
+import Distribution.Dev.Utilities          ( ensureAbsolute )
+
+import System.Directory ( getAppUserDataDirectory )
 
 actions :: String -> CommandActions
 actions act = CommandActions
@@ -121,7 +123,7 @@ ghcPkgCompatProgram  = p { programFindLocation =
                              res <- programFindLocation p v
                              case res of
                                Nothing -> return Nothing
-                               Just loc -> Just `fmap` canonicalizePath loc
+                               Just loc -> Just `fmap` ensureAbsolute loc
                          }
     where
       p = simpleProgram "ghc-pkg-6_8-compat"

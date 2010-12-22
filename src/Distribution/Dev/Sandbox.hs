@@ -21,7 +21,7 @@ import Control.Monad             ( unless )
 import Data.Version              ( Version, showVersion )
 import Distribution.Simple.Utils ( debug )
 import Distribution.Verbosity    ( Verbosity )
-import System.Directory          ( canonicalizePath, createDirectoryIfMissing
+import System.Directory          ( createDirectoryIfMissing
                                  , doesFileExist, copyFile )
 import System.FilePath           ( (</>) )
 
@@ -32,6 +32,7 @@ import System.Win32.Types ( getLastError )
 
 import qualified Distribution.Dev.Flags as F
     ( getVerbosity, Config, getSandbox, sandboxSpecified )
+import Distribution.Dev.Utilities ( ensureAbsolute )
 
 import Paths_cabal_dev ( getDataFileName )
 
@@ -75,7 +76,8 @@ cabalConf = sPath "cabal.config"
 
 newSandbox :: Verbosity -> FilePath -> IO (Sandbox UnknownVersion)
 newSandbox v relSandboxDir = do
-  sandboxDir <- canonicalizePath relSandboxDir
+  debug v $ "Using " ++ relSandboxDir ++ " as the relative cabal-dev sandbox"
+  sandboxDir <- ensureAbsolute relSandboxDir
   debug v $ "Using " ++ sandboxDir ++ " as the cabal-dev sandbox"
   vista32Workaround_createDirectoryIfMissing True sandboxDir
   let sb = UnknownVersion sandboxDir
