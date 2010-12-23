@@ -4,10 +4,11 @@ where
 
 import Distribution.Dev.Command ( CommandActions(..), CommandResult(..) )
 import Distribution.Dev.Flags ( Config, getVerbosity, getSandbox )
-
+import Distribution.Dev.InitPkgDb ( initPkgDb )
+import Distribution.Dev.Sandbox ( pkgConf, Sandbox, KnownVersion, resolveSandbox )
 import Distribution.Simple.Program ( Program( programFindVersion
                                             )
-                                   , ConfiguredProgram( programDefaultArgs )
+                                   , ConfiguredProgram( programArgs )
                                    , emptyProgramConfiguration
                                    , findProgramVersion
                                    , runProgram
@@ -30,17 +31,15 @@ actions = CommandActions
               , cmdPassFlags = True
               }
 
-packageConf :: String
-packageConf = "packages-7.0.1.conf"
-
-ghciArgs :: FilePath -> [String]
-ghciArgs sandbox = [ "-package-conf", sandbox </> packageConf
+ghciArgs :: Sandbox KnownVersion -> [String]
+ghciArgs sandbox = [ "-package-conf", pkgConf sandbox
                    , "-no-user-package-conf"
                    ]
 
 configureGhci :: Config -> IO ConfiguredProgram
 configureGhci cfg = do (ghci, _) <- requireProgram (getVerbosity cfg) ghciProgram emptyProgramConfiguration
-                       return ghci { programDefaultArgs = ghciArgs (getSandbox cfg) }
+                       sandbox <- initPkgDb (getVerbosity cfg) =<< (resolveSandbox cfg)
+                       return ghci { programArgs = ghciArgs sandbox }
 
 -- XXX This invocation pattern is repeated in at least two places (see InvokeCabal)
 invokeGhci :: Config -> [String] -> IO CommandResult
