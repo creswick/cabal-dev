@@ -65,6 +65,7 @@ ghcPackageDbType p =
     where
       res = do
         v <- programVersion p
+        -- XXX Needs updated for ghc 7
         let typ | v < Version [6, 10] [] = GHC_6_8_Db $ locationPath $
                                            programLocation p
                 | v < Version [6, 12] [] = GHC_6_10_Db
