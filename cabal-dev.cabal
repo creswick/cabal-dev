@@ -1,5 +1,5 @@
 Name:                cabal-dev
-Version:             0.7.3.1
+Version:             0.7.3.2
 Synopsis:            Manage sandboxed Haskell build environments
 
 Description:         cabal-dev is a tool for managing development builds of
@@ -42,7 +42,7 @@ Data-Files:
 
 source-repository head
   type:        git
-  location:    git@github.com:creswick/cabal-dev.git
+  location:    git://github.com/creswick/cabal-dev.git
 
 Flag no-cabal-dev
   Description: Do not build cabal-dev (just build ghc-pkg-6_8-compat).
