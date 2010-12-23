@@ -117,7 +117,7 @@ Executable cabal-dev
       bytestring >= 0.9 && < 0.10,
       directory >= 1.0 && < 1.3,
       filepath >= 1.1 && < 1.3,
-      Cabal >= 1.8.0.6 && < 1.11,
+      Cabal >= 1.10.0.0 && < 1.11,
       HTTP >= 4000.0.9 && < 4000.2,
       mtl >= 1.1 && < 2.1,
       network >= 2.2 && < 2.4,

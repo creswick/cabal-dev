@@ -8,7 +8,7 @@ import Distribution.Dev.InitPkgDb ( initPkgDb )
 import Distribution.Dev.Sandbox ( pkgConf, Sandbox, KnownVersion, resolveSandbox )
 import Distribution.Simple.Program ( Program( programFindVersion
                                             )
-                                   , ConfiguredProgram( programArgs )
+                                   , ConfiguredProgram( programDefaultArgs )
                                    , emptyProgramConfiguration
                                    , findProgramVersion
                                    , runProgram
@@ -39,7 +39,7 @@ ghciArgs sandbox = [ "-package-conf", pkgConf sandbox
 configureGhci :: Config -> IO ConfiguredProgram
 configureGhci cfg = do (ghci, _) <- requireProgram (getVerbosity cfg) ghciProgram emptyProgramConfiguration
                        sandbox <- initPkgDb (getVerbosity cfg) =<< (resolveSandbox cfg)
-                       return ghci { programArgs = ghciArgs sandbox }
+                       return ghci { programDefaultArgs = ghciArgs sandbox }
 
 -- XXX This invocation pattern is repeated in at least two places (see InvokeCabal)
 invokeGhci :: Config -> [String] -> IO CommandResult
