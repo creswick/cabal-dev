@@ -18,6 +18,7 @@ import Distribution.Dev.Flags ( parseGlobalFlags, helpRequested, globalOpts
                               , getVerbosity, Config
                               )
 import qualified Distribution.Dev.AddSource as AddSource
+import qualified Distribution.Dev.Ghci as Ghci
 import qualified Distribution.Dev.InvokeCabal as InvokeCabal
 import qualified Distribution.Dev.InstallDependencies as InstallDeps
 import Paths_cabal_dev ( version )
@@ -25,6 +26,7 @@ import Paths_cabal_dev ( version )
 allCommands :: [(String, CommandActions)]
 allCommands = [ ("add-source", AddSource.actions)
               , ("install-deps", InstallDeps.actions)
+              , ("ghci", Ghci.actions)
               , cabal "build"
               , cabal "clean"
               , cabal "configure"

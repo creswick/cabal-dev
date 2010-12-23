@@ -1,5 +1,5 @@
 Name:                cabal-dev
-Version:             0.7.2.1
+Version:             0.7.3.0
 Synopsis:            Manage sandboxed Haskell build environments
 
 Description:         cabal-dev is a tool for managing development builds of
@@ -137,8 +137,9 @@ Executable cabal-dev
     Distribution.Dev.Sandbox,
     Distribution.Dev.Command,
     Distribution.Dev.Flags,
+    Distribution.Dev.Ghci,
     Distribution.Dev.InvokeCabal,
     Distribution.Dev.InstallDependencies,
     Distribution.Dev.RewriteCabalConfig,
-    Distribution.Dev.InitPkgDb
+    Distribution.Dev.InitPkgDb,
     Distribution.Dev.Utilities
