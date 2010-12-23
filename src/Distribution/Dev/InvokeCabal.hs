@@ -128,6 +128,7 @@ ghcPkgCompatProgram  = p { programFindLocation =
     where
       p = simpleProgram "ghc-pkg-6_8-compat"
 
+-- XXX This is duplicated in Setup.hs
 cabalProgram :: Program
 cabalProgram =
     (simpleProgram "cabal") { programFindVersion =
