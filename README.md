@@ -34,6 +34,38 @@ commands that place the project's build artifacts in the cabal-dev
 sandbox, as well as leaving the binaries in the familiar `dist`
 directory.
 
+### Ghci with cabal-dev
+
+Cabal-dev 0.7.3.1 and greater are capable of launching ghci with the
+project's package database and local modules (if the package under
+development exposes a library).
+
+    # First, you must cabal-dev install the package to populate the
+    # package database:
+    $ cabal-dev install
+    ....
+    <snip>
+    ....
+    $ cabal-dev ghci
+    GHCi, version 6.12.3: http://www.haskell.org/ghc/  :? for help
+    Loading package ghc-prim ... linking ... done.
+    Loading package integer-gmp ... linking ... done.
+    Loading package base ... linking ... done.
+    Loading package ffi-1.0 ... linking ... done.
+    Prelude>
+
+The ghci shell should have access to all the libraries your
+application/library is using, as well as any modules that your library
+exposes.
+
+Note that this is not quite as natural as your traditional ghci shell,
+namely: Source modifications are not visible without exiting,
+re-issuing `cabal-dev install` *and* `cabal-dev ghci`.  This will
+eventually get better, but that's where things are right now.  The
+reason for this is that `cabal-dev ghci` just issues ghci with the
+cabal-dev package database (and excluding the user package db, to best
+reflect what cabal-dev does when it causes compilation).
+
 ## Building with private dependencies
 
 Cabal-dev also allows you to use un-released packages as though they
