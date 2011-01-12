@@ -27,6 +27,7 @@ import Distribution.Simple.Utils ( withTempDirectory, info )
 import Distribution.Text ( simpleParse, display )
 import Distribution.Verbosity ( normal, Verbosity, showForCabal, verbose )
 import Distribution.Version ( Version(..) )
+import Distribution.Dev.Flags ( parseGlobalFlags )
 import Distribution.Dev.InitPkgDb ( initPkgDb )
 import Distribution.Dev.Sandbox ( newSandbox, pkgConf, Sandbox, KnownVersion, sandbox, indexTar )
 import System.IO ( withBinaryFile, IOMode(ReadMode) )
@@ -39,6 +40,7 @@ import System.FilePath ( (</>), (<.>), takeExtension )
 import System.Random ( RandomGen )
 import Test.Framework ( defaultMainWithArgs, Test, testGroup )
 import Test.Framework.Providers.HUnit ( testCase )
+import Test.HUnit ( (@?=) )
 import qualified Test.HUnit as HUnit
 
 import Distribution.Client.Config -- ( parseConfig )
@@ -84,6 +86,9 @@ testBasicInvocation p =
 
     , testCase "exits with failure when no arguments are supplied" $
       assertExitsFailure p []
+
+    , testCase "short flag is passed through to cabal" $
+      assertShortFlags
     ]
 
 main :: IO ()
@@ -161,6 +166,13 @@ assertExitsSuccess = assertProgram "exits successfully" $
 assertExitsFailure :: FilePath -> [String] -> HUnit.Assertion
 assertExitsFailure = assertProgram "exits with failure" $
                      (ExitSuccess /=) . fst3
+
+
+-- | Test for short flags.  Verifies that a short flag can make it past the cabal-dev
+-- command line arg parser (and then, presumably, to cabal-install).
+-- Created due to issue 6: https://github.com/creswick/cabal-dev/issues#issue/6
+assertShortFlags :: HUnit.Assertion
+assertShortFlags = (parseGlobalFlags $ words "install -f-curl") @?= ([],["install", "-f-curl"],[])
 
 fst3 :: (a, b, c) -> a
 fst3 (x, _, _) = x
