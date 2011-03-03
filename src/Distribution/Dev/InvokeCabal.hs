@@ -13,6 +13,7 @@ import Distribution.Verbosity ( Verbosity, showForCabal )
 import Distribution.Simple.Program ( Program( programFindVersion
                                             , programFindLocation
                                             )
+                                   , ConfiguredProgram
                                    , emptyProgramConfiguration
                                    , findProgramVersion
                                    , locationPath
@@ -60,11 +61,12 @@ invokeCabal :: Config -> [String] -> IO CommandResult
 invokeCabal flgs args = do
   let v = getVerbosity flgs
   s <- initPkgDb v =<< resolveSandbox flgs
+  cabal <- findCabalOnPath v
   res <- setup s flgs
   case res of
     Left err -> return $ CommandError err
     Right args' -> do
-             invokeCabalCfg v $ args' ++ args
+             runProgram v cabal $ args' ++ args
              return CommandOk
 
 cabalArgs :: Config -> IO (Either String [String])
@@ -137,18 +139,18 @@ cabalProgram =
                                   findProgramVersion "--numeric-version" id
                             }
 
-invokeCabalCfg :: Verbosity -> [String] -> IO ()
-invokeCabalCfg v args = do
+findCabalOnPath :: Verbosity -> IO ConfiguredProgram
+findCabalOnPath v = do
   (cabal, _) <- requireProgram v cabalProgram emptyProgramConfiguration
   debug v $ concat [ "Using cabal-install "
                    , maybe "(unknown version)" display $ programVersion cabal
                    , " at "
                    , show (programLocation cabal)
                    ]
-  runProgram v cabal args
+  return cabal
 
-cabalVersion :: String -> Either String Version
-cabalVersion str =
+cabalVer :: String -> Either String Version
+cabalVer str =
     case lines str of
       []      -> Left "No version string provided."
       [x]     -> Left "Could not find Cabal version line."
