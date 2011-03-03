@@ -80,7 +80,9 @@ setup s flgs = do
   let cfgOut = cabalConf s
   cabalHome <- getAppUserDataDirectory "cabal"
   withUTF8FileContents cfgIn $ \cIn ->
-      do cfgRes <- R.rewriteCabalConfig (R.Rewrite cabalHome (sandbox s) (pkgConf s)) cIn
+      do let qInstDirs = True
+         let rew = R.Rewrite cabalHome (sandbox s) (pkgConf s) qInstDirs
+         cfgRes <- R.rewriteCabalConfig rew cIn
          case cfgRes of
            Left err -> return $ Left $
                        "Error processing cabal config file " ++ cfgIn ++ ": " ++ err

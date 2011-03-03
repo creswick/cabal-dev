@@ -20,17 +20,18 @@ import Control.Monad             ( liftM )
 import Distribution.ParseUtils   ( readFields, ParseResult(..), Field(..) )
 import Text.PrettyPrint.HughesPJ
 
-data Rewrite = Rewrite { homeDir :: FilePath
-                       , sandboxDir :: FilePath
-                       , packageDb :: FilePath
+data Rewrite = Rewrite { homeDir          :: FilePath
+                       , sandboxDir       :: FilePath
+                       , packageDb        :: FilePath
+                       , quoteInstallDirs :: Bool
                        }
 
 -- |Rewrite a cabal-install config file so that all paths are made
 -- absolute and canonical.
 rewriteCabalConfig :: Rewrite -> String -> IO (Either String String)
-rewriteCabalConfig r =
-    rewriteConfig (expandCabalConfig (homeDir r) (sandboxDir r))
-                      (setPackageDb $ packageDb r)
+rewriteCabalConfig r = rewriteConfig expand (setPackageDb $ packageDb r)
+  where
+    expand = expandCabalConfig (quoteInstallDirs r) (homeDir r) (sandboxDir r)
 
 -- |Given an expansion configuration, read the input config file and
 -- write the expansion into the output config file
@@ -113,8 +114,13 @@ don'tExpand = Expand return [] []
 --
 -- If the cabal-install config file changes, or if this list is not
 -- complete, this code will have to be updated.
-expandCabalConfig :: FilePath -> FilePath -> Expand IO
-expandCabalConfig home sandbox =
+expandCabalConfig :: Bool -- ^Whether the install-dirs section of the
+                          -- cabal config file will quote paths.
+                          -- Versions of cabal-install prior to 0.9
+                          -- required quoting. Versions 0.9 and later
+                          -- forbit it.
+                     -> FilePath -> FilePath -> Expand IO
+expandCabalConfig shouldQuote home sandbox =
     Expand { eExpand = ePath
            , eLeaves = [ "remote-repo-cache"
                        , "local-repo"
@@ -134,7 +140,7 @@ expandCabalConfig home sandbox =
            }
     where
       expandInstallDirs =
-          Expand { eExpand = fmap show . ePath
+          Expand { eExpand = quote . ePath
                  , eLeaves =
                      [ "prefix"
                      , "bindir"
@@ -149,5 +155,9 @@ expandCabalConfig home sandbox =
                      ]
                  , eSections = []
                  }
+
+      -- How install-dirs should quote its paths
+      quote | shouldQuote = fmap show
+            | otherwise   = id
 
       ePath = return . expandDot sandbox . expandTilde home
