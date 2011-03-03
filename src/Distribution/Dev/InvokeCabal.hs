@@ -24,7 +24,7 @@ import Distribution.Simple.Program ( Program( programFindVersion
                                    )
 import Distribution.Simple.Utils ( withUTF8FileContents, writeUTF8File
                                  , debug, cabalVersion )
-import Distribution.Text ( display )
+import Distribution.Text ( display, simpleParse )
 import System.Console.GetOpt  ( OptDescr )
 
 import Distribution.Dev.Command            ( CommandActions(..)
@@ -144,3 +144,14 @@ invokeCabalCfg v args = do
                    , show (programLocation cabal)
                    ]
   runProgram v cabal args
+
+cabalVersion :: String -> Either String Version
+cabalVersion str =
+    case lines str of
+      []      -> Left "No version string provided."
+      [x]     -> Left "Could not find Cabal version line."
+      (_:ln:_) -> case simpleParse ((words ln)!!2) of
+                   Just v  -> Right v
+                   Nothing -> Left $ err ln
+        where err ln = "Could not parse Cabal verison.\n"
+                       ++ "(simpleParse "++show ln++")"
