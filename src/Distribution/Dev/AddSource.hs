@@ -68,7 +68,6 @@ import qualified Data.ByteString.Lazy        as L
 import qualified Data.ByteString.Lazy.Char8  as L8 ( unpack )
 import qualified Distribution.Verbosity      as V
 
-import Distribution.Dev.InvokeCabal ( cabalArgs )
 import Distribution.Dev.Command ( CommandActions(..), CommandResult(..) )
 import Distribution.Dev.Flags   ( Config, getVerbosity )
 import Distribution.Dev.Sandbox ( resolveSandbox, localRepoPath
@@ -92,39 +91,33 @@ addSources flgs fns = do
   let v = getVerbosity flgs
   debug v $ "Making a cabal repo in " ++ localRepoPath sandbox ++
             " out of " ++ show fns
-  eArgs <- cabalArgs flgs
-  case eArgs of
-    Left err -> return $ CommandError $ "Error getting cabal arguments: " ++ err
-    Right args ->
-        do
-          results <- mapM (processLocalSource v) fns
-          let errs = [e | Left e <- results]
-              srcs = [s | Right s <- results]
-          if not $ null errs
-            then return $ CommandError $ unlines $
-                     "Errors finding cabal files:":map (showString "  ") errs
-            else do
-              let (sources, newEntries) = unzip srcs
-              res <- readExistingIndex sandbox
-              case res of
-                Left err -> return $
-                            CommandError $ "Error reading existing index: " ++ err
-                Right existingIndex ->
-                    do let newIndex = mergeIndices existingIndex newEntries
-                       -- Now we have the new index ready and have
-                       -- sanity-checked all of the package locations
-                       -- to be sure that they contain a cabal package
-                       -- (or at least a .cabal file)
-                       --
-                       -- Now to install the tarballs for the
-                       -- directories:
-                       forM_ sources $ \(src, pkgId, pkgDesc) ->
-                           installTarball flgs sandbox src pkgId pkgDesc args
-
-                       -- and now that the tarballs are in place,
-                       -- write out the updated index
-                       writeIndex sandbox newIndex
-                       return CommandOk
+  results <- mapM (processLocalSource v) fns
+  let errs = [e | Left e <- results]
+      srcs = [s | Right s <- results]
+  if not $ null errs
+      then return $ CommandError $ unlines $
+               "Errors finding cabal files:":map (showString "  ") errs
+      else do
+        let (sources, newEntries) = unzip srcs
+        res <- readExistingIndex sandbox
+        case res of
+          Left err -> return $
+                 CommandError $ "Error reading existing index: " ++ err
+          Right existingIndex ->
+              do let newIndex = mergeIndices existingIndex newEntries
+                 -- Now we have the new index ready and have
+                 -- sanity-checked all of the package locations
+                 -- to be sure that they contain a cabal package
+                 -- (or at least a .cabal file)
+                 --
+                 -- Now to install the tarballs for the
+                 -- directories:
+                 forM_ sources $ \(src, pkgId, pkgDesc) ->
+                      installTarball flgs sandbox src pkgId pkgDesc
+                 -- and now that the tarballs are in place,
+                 -- write out the updated index
+                 writeIndex sandbox newIndex
+                 return CommandOk
 
 -- |Atomically write an index tarball in the supplied directory
 writeIndex :: Sandbox a -- ^The local repository path
@@ -196,9 +189,8 @@ installTarball :: Config
                -> LocalSource -- ^What kind of package source
                -> PackageIdentifier
                -> PackageDescription -- ^Package description
-               -> [String] -- ^Cabal args, computed at the top level
                -> IO (Either String ())
-installTarball flgs sandbox src pkgId pkgDesc _ =
+installTarball flgs sandbox src pkgId pkgDesc =
     do createDirectoryIfMissing True $ localRepoPath sandbox </> repoDir pkgId
        case src of
          TarPkg fn -> do copyFile fn dest

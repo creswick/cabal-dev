@@ -8,7 +8,7 @@ module Distribution.Dev.InvokeCabal
     )
 where
 
-import Distribution.Version ( Version(..) )
+import Distribution.Version ( Version(..), VersionRange, withinRange, earlierVersion )
 import Distribution.Verbosity ( Verbosity, showForCabal )
 import Distribution.Simple.Program ( Program( programFindVersion
                                             , programFindLocation
@@ -21,6 +21,7 @@ import Distribution.Simple.Program ( Program( programFindVersion
                                    , programVersion
                                    , requireProgram
                                    , runProgram
+                                   , getProgramOutput
                                    , simpleProgram
                                    )
 import Distribution.Simple.Utils ( withUTF8FileContents, writeUTF8File
@@ -62,36 +63,40 @@ invokeCabal flgs args = do
   let v = getVerbosity flgs
   s <- initPkgDb v =<< resolveSandbox flgs
   cabal <- findCabalOnPath v
-  res <- setup s flgs
+  res <- setup s cabal flgs
   case res of
     Left err -> return $ CommandError err
     Right args' -> do
              runProgram v cabal $ args' ++ args
              return CommandOk
 
-cabalArgs :: Config -> IO (Either String [String])
-cabalArgs flgs = do
+cabalArgs :: ConfiguredProgram -> Config -> IO (Either String [String])
+cabalArgs cabal flgs = do
   let v = getVerbosity flgs
   s <- initPkgDb v =<< resolveSandbox flgs
-  setup s flgs
+  setup s cabal flgs
 
-setup :: Sandbox KnownVersion-> Config -> IO (Either String [String])
-setup s flgs = do
+setup :: Sandbox KnownVersion -> ConfiguredProgram -> Config -> IO (Either String [String])
+setup s cabal flgs = do
   let v = getVerbosity flgs
+  verOut <- getProgramOutput v cabal ["--version"]
   cfgIn <- getCabalConfig flgs
   let cfgOut = cabalConf s
-  cabalHome <- getAppUserDataDirectory "cabal"
-  withUTF8FileContents cfgIn $ \cIn ->
-      do let qInstDirs = True
-         let rew = R.Rewrite cabalHome (sandbox s) (pkgConf s) qInstDirs
-         cfgRes <- R.rewriteCabalConfig rew cIn
-         case cfgRes of
-           Left err -> return $ Left $
-                       "Error processing cabal config file " ++ cfgIn ++ ": " ++ err
-           Right cOut -> do
-                       writeUTF8File cfgOut cOut
-                       args <- extraArgs v cfgOut (getVersion s)
-                       return $ Right args
+  case cabalVer verOut of
+    Left err -> return $ Left err
+    Right ver -> do
+      cabalHome <- getAppUserDataDirectory "cabal"
+      let qInstDirs = withinRange ver cabalNeedsQuotes
+          rew = R.Rewrite cabalHome (sandbox s) (pkgConf s) qInstDirs
+      withUTF8FileContents cfgIn $ \cIn ->
+          do cfgRes <- R.rewriteCabalConfig rew cIn
+             case cfgRes of
+               Left err -> return $ Left $
+                  "Error processing cabal config file " ++ cfgIn ++ ": " ++ err
+               Right cOut -> do
+                  writeUTF8File cfgOut cOut
+                  args <- extraArgs v cfgOut (getVersion s)
+                  return $ Right args
 
 extraArgs :: Verbosity -> FilePath -> PackageDbType -> IO [String]
 extraArgs v cfg pdb =
@@ -153,9 +158,12 @@ cabalVer :: String -> Either String Version
 cabalVer str =
     case lines str of
       []      -> Left "No version string provided."
-      [x]     -> Left "Could not find Cabal version line."
+      [_]     -> Left "Could not find Cabal version line."
       (_:ln:_) -> case simpleParse ((words ln)!!2) of
                    Just v  -> Right v
                    Nothing -> Left $ err ln
-        where err ln = "Could not parse Cabal verison.\n"
-                       ++ "(simpleParse "++show ln++")"
+        where err line = "Could not parse Cabal verison.\n"
+                         ++ "(simpleParse "++show line++")"
+
+cabalNeedsQuotes :: VersionRange
+cabalNeedsQuotes = earlierVersion $ Version [1,10] []

@@ -27,12 +27,11 @@ installDependencies :: Config -> [String] -> IO CommandResult
 installDependencies flgs pkgNames = do
   let v = getVerbosity flgs
   s <- initPkgDb v =<< resolveSandbox flgs
-  setupRes <- setup s flgs
+  (cabal, _) <- requireProgram v cabalProgram emptyProgramDb
+  setupRes <- setup s cabal flgs
   case setupRes of
     Left err -> return $ CommandError err
-    Right args ->
-        do
-          (cabal, _) <- requireProgram v cabalProgram emptyProgramDb
+    Right args -> do
           out <- getProgramOutput v cabal $ concat
                  [ args
                  , ["install", "--dry-run", "--verbose=1"]

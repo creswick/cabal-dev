@@ -198,7 +198,9 @@ createCabalConfig sandbox ghcPkgDb = do
   let cfgOut = sandbox </> "cabal.config"
   cabalHome <- getAppUserDataDirectory "cabal"
   either fail (writeFile cfgOut)
-      =<< R.rewriteCabalConfig (R.Rewrite cabalHome sandbox ghcPkgDb)
+       -- XXX False should be determined based on the version of Cabal
+       -- that the currently accessible cabal-install was built with:
+      =<< R.rewriteCabalConfig (R.Rewrite cabalHome sandbox ghcPkgDb False)
       =<< readFile cfgIn
   return cfgOut
 
