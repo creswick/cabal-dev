@@ -198,7 +198,7 @@ installTarball :: Config
                -> PackageDescription -- ^Package description
                -> [String] -- ^Cabal args, computed at the top level
                -> IO (Either String ())
-installTarball flgs sandbox src pkgId pkgDesc args =
+installTarball flgs sandbox src pkgId pkgDesc _ =
     do createDirectoryIfMissing True $ localRepoPath sandbox </> repoDir pkgId
        case src of
          TarPkg fn -> do copyFile fn dest
@@ -228,7 +228,7 @@ installTarball flgs sandbox src pkgId pkgDesc args =
                                     -- program.  We do this to work
                                     -- around a different bug in Cabal
                                     -- (http://hackage.haskell.org/trac/hackage/ticket/731)
-                                    rawSystem "cabal" ["configure"]
+                                    _ <- rawSystem "cabal" ["configure"]
                                     rawSystem "dist/setup/setup" ["sdist"]
                                   _ -> rawSystem "cabal" ["sdist"]
 
