@@ -37,7 +37,8 @@ installDependencies flgs pkgNames = do
     (Right args, Right features) ->
       if CI.hasOnlyDependencies features
       then do notice v "You are using a version of cabal-install that has \
-                       \the --only-dependencies flag to the install command."
+                       \the --only-dependencies flag to the install command.\
+                       \ Invoking that instead..."
               runProgram v cabal $ concat [ args
                                           , ["install", "--only-dependencies"]
                                           , pkgNames
