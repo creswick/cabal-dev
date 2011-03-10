@@ -9,7 +9,6 @@ module Distribution.Dev.CabalInstall
        )
 where
 
-import Control.Arrow ( right )
 import Control.Applicative ( (<$>) )
 import Distribution.Version ( Version(..), withinRange
                             , earlierVersion, orLaterVersion )
@@ -31,12 +30,14 @@ import Distribution.Text ( display, simpleParse )
 import System.Directory ( getAppUserDataDirectory )
 
 -- XXX This is duplicated in Setup.hs
+-- |Definition of the cabal-install program
 program :: Program
 program =
     (simpleProgram "cabal") { programFindVersion =
                                   findProgramVersion "--numeric-version" id
                             }
 
+-- |Find cabal-install on the user's PATH
 findOnPath :: Verbosity -> IO ConfiguredProgram
 findOnPath v = do
   (cabal, _) <- requireProgram v program emptyProgramConfiguration
@@ -47,6 +48,7 @@ findOnPath v = do
                    ]
   return cabal
 
+-- |Parse the Cabal library version from the output of cabal --version
 parseVersionOutput :: String -> Either String Version
 parseVersionOutput str =
     case lines str of
@@ -58,23 +60,41 @@ parseVersionOutput str =
         where err line = "Could not parse Cabal verison.\n"
                          ++ "(simpleParse "++show line++")"
 
-newtype CabalFeatures = CabalFeatures { cfVersion :: Version }
+-- |The information necessary to properly invoke cabal-install
+data CabalFeatures = CabalFeatures { cfLibVersion :: Version
+                                   , cfExeVersion :: Version
+                                   }
 
 mkVer :: [Int] -> Version
 mkVer l = Version l []
 
+-- |Extract the features of this cabal-install executable
 getFeatures :: Verbosity -> ConfiguredProgram ->
                IO (Either String CabalFeatures)
-getFeatures v cabal =
-  right CabalFeatures . parseVersionOutput <$>
-  getProgramOutput v cabal ["--version"]
+getFeatures v cabal = do
+  case programVersion cabal of
+    Nothing -> return $ Left "Failed to find cabal-install version"
+    Just exeVer -> do
+      verRes <- parseVersionOutput <$> getProgramOutput v cabal ["--version"]
+      case verRes of
+        Left err -> return $ Left $ "Detecting cabal-install's Cabal: " ++ err
+        Right libVer -> return $ Right $
+                        CabalFeatures { cfLibVersion = libVer
+                                      , cfExeVersion = exeVer
+                                      }
 
+-- |Does the cabal-install configuration file use quoted paths in the
+-- install-dirs section?
 needsQuotes :: CabalFeatures -> Bool
-needsQuotes = (`withinRange` earlierVersion (mkVer [1,10])) . cfVersion
+needsQuotes = (`withinRange` earlierVersion (mkVer [1,10])) . cfLibVersion
 
+-- |Does this cabal-install executable support the --dependencies-only
+-- flag to install?
 hasOnlyDependencies :: CabalFeatures -> Bool
 hasOnlyDependencies =
-  (`withinRange` orLaterVersion (mkVer [1, 10])) . cfVersion
+  (`withinRange` orLaterVersion (mkVer [0, 10])) . cfExeVersion
+
+-- |What is the configuration directory for this cabal-install executable?
 
 -- XXX: This needs to do something different for certain platforms for
 -- new versions of cabal-install (look at the tickets on creswick's

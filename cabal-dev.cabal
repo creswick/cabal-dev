@@ -136,6 +136,7 @@ Executable cabal-dev
     Distribution.Dev.AddSource,
     Distribution.Dev.Sandbox,
     Distribution.Dev.Command,
+    Distribution.Dev.CabalInstall,
     Distribution.Dev.Flags,
     Distribution.Dev.Ghci,
     Distribution.Dev.InvokeCabal,

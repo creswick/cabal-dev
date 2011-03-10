@@ -3,30 +3,23 @@ module Distribution.Dev.InvokeCabal
     ( actions
     , setup
     , extraArgs
-    , cabalProgram
     , cabalArgs
     )
 where
 
-import Distribution.Version ( Version(..), VersionRange, withinRange, earlierVersion )
 import Distribution.Verbosity ( Verbosity, showForCabal )
-import Distribution.Simple.Program ( Program( programFindVersion
-                                            , programFindLocation
-                                            )
+import Distribution.Simple.Program ( Program( programFindLocation )
                                    , ConfiguredProgram
                                    , emptyProgramConfiguration
-                                   , findProgramVersion
                                    , locationPath
                                    , programLocation
-                                   , programVersion
                                    , requireProgram
                                    , runProgram
-                                   , getProgramOutput
                                    , simpleProgram
                                    )
 import Distribution.Simple.Utils ( withUTF8FileContents, writeUTF8File
                                  , debug, cabalVersion )
-import Distribution.Text ( display, simpleParse )
+import Distribution.Version ( Version(..) )
 import System.Console.GetOpt  ( OptDescr )
 
 import Distribution.Dev.Command            ( CommandActions(..)
@@ -37,6 +30,7 @@ import Distribution.Dev.Flags              ( Config, getCabalConfig
                                            )
 import Distribution.Dev.InitPkgDb          ( initPkgDb )
 import qualified Distribution.Dev.RewriteCabalConfig as R
+import qualified Distribution.Dev.CabalInstall as CI
 import Distribution.Dev.Sandbox            ( resolveSandbox
                                            , cabalConf
                                            , Sandbox
@@ -47,8 +41,6 @@ import Distribution.Dev.Sandbox            ( resolveSandbox
                                            , sandbox
                                            )
 import Distribution.Dev.Utilities          ( ensureAbsolute )
-
-import System.Directory ( getAppUserDataDirectory )
 
 actions :: String -> CommandActions
 actions act = CommandActions
@@ -62,7 +54,7 @@ invokeCabal :: Config -> [String] -> IO CommandResult
 invokeCabal flgs args = do
   let v = getVerbosity flgs
   s <- initPkgDb v =<< resolveSandbox flgs
-  cabal <- findCabalOnPath v
+  cabal <- CI.findOnPath v
   res <- setup s cabal flgs
   case res of
     Left err -> return $ CommandError err
@@ -76,18 +68,18 @@ cabalArgs cabal flgs = do
   s <- initPkgDb v =<< resolveSandbox flgs
   setup s cabal flgs
 
-setup :: Sandbox KnownVersion -> ConfiguredProgram -> Config -> IO (Either String [String])
+setup :: Sandbox KnownVersion -> ConfiguredProgram -> Config ->
+         IO (Either String [String])
 setup s cabal flgs = do
   let v = getVerbosity flgs
-  verOut <- getProgramOutput v cabal ["--version"]
   cfgIn <- getCabalConfig flgs
+  cVer <- CI.getFeatures v cabal
   let cfgOut = cabalConf s
-  case cabalVer verOut of
+  case cVer of
     Left err -> return $ Left err
-    Right ver -> do
-      cabalHome <- getAppUserDataDirectory "cabal"
-      let qInstDirs = withinRange ver cabalNeedsQuotes
-          rew = R.Rewrite cabalHome (sandbox s) (pkgConf s) qInstDirs
+    Right features -> do
+      cabalHome <- CI.configDir features
+      let rew = R.Rewrite cabalHome (sandbox s) (pkgConf s) (CI.needsQuotes features)
       withUTF8FileContents cfgIn $ \cIn ->
           do cfgRes <- R.rewriteCabalConfig rew cIn
              case cfgRes of
@@ -122,7 +114,10 @@ extraArgs v cfg pdb =
             _ -> return []
 
 -- XXX: this is very imprecise. Right now, we require a specific
--- version of Cabal, so this is ok (and is equivalent to True)
+-- version of Cabal, so this is ok (and is equivalent to True). Note
+-- that this is the version of Cabal that THIS PROGRAM is being built
+-- against, rather than the version that CABAL-INSTALL was built
+-- against.
 needsGHC68Compat :: Bool
 needsGHC68Compat = cabalVersion < Version [1, 9] []
 
@@ -136,34 +131,3 @@ ghcPkgCompatProgram  = p { programFindLocation =
                          }
     where
       p = simpleProgram "ghc-pkg-6_8-compat"
-
--- XXX This is duplicated in Setup.hs
-cabalProgram :: Program
-cabalProgram =
-    (simpleProgram "cabal") { programFindVersion =
-                                  findProgramVersion "--numeric-version" id
-                            }
-
-findCabalOnPath :: Verbosity -> IO ConfiguredProgram
-findCabalOnPath v = do
-  (cabal, _) <- requireProgram v cabalProgram emptyProgramConfiguration
-  debug v $ concat [ "Using cabal-install "
-                   , maybe "(unknown version)" display $ programVersion cabal
-                   , " at "
-                   , show (programLocation cabal)
-                   ]
-  return cabal
-
-cabalVer :: String -> Either String Version
-cabalVer str =
-    case lines str of
-      []      -> Left "No version string provided."
-      [_]     -> Left "Could not find Cabal version line."
-      (_:ln:_) -> case simpleParse ((words ln)!!2) of
-                   Just v  -> Right v
-                   Nothing -> Left $ err ln
-        where err line = "Could not parse Cabal verison.\n"
-                         ++ "(simpleParse "++show line++")"
-
-cabalNeedsQuotes :: VersionRange
-cabalNeedsQuotes = earlierVersion $ Version [1,10] []
