@@ -23,13 +23,15 @@ import Text.PrettyPrint.HughesPJ
 data Rewrite = Rewrite { homeDir          :: FilePath
                        , sandboxDir       :: FilePath
                        , packageDb        :: FilePath
+                       , extraFields      :: [Field]
                        , quoteInstallDirs :: Bool
                        }
 
 -- |Rewrite a cabal-install config file so that all paths are made
 -- absolute and canonical.
 rewriteCabalConfig :: Rewrite -> String -> IO (Either String String)
-rewriteCabalConfig r = rewriteConfig expand (setPackageDb $ packageDb r)
+rewriteCabalConfig r = rewriteConfig expand (insertExtraFields (extraFields r) 
+                                            . setPackageDb (packageDb r))
   where
     expand = expandCabalConfig (quoteInstallDirs r) (homeDir r) (sandboxDir r)
 
@@ -41,7 +43,10 @@ rewriteConfig expand proc s =
         case readFields s of
           ParseFailed err -> return $ Left $ show err
           ParseOk _ fs    ->
-              (Right . show . ppTopLevel . proc) `fmap` rewriteTopLevel expand fs
+              (Right . show . ppTopLevel . proc ) `fmap` rewriteTopLevel expand fs
+
+insertExtraFields :: [Field] -> [Field] -> [Field]
+insertExtraFields fields fs = fields++fs 
 
 setPackageDb :: FilePath -> [Field] -> [Field]
 setPackageDb pkgDb = (F 0 "package-db" pkgDb:) . filter (not . isPackageDb)

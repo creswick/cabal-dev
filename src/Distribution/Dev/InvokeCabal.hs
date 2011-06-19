@@ -19,6 +19,7 @@ import Distribution.Simple.Program ( Program( programFindLocation )
                                    )
 import Distribution.Simple.Utils ( withUTF8FileContents, writeUTF8File
                                  , debug, cabalVersion )
+import Distribution.ParseUtils   ( readFields, ParseResult(..), Field(..) )
 import Distribution.Version ( Version(..) )
 import System.Console.GetOpt  ( OptDescr )
 
@@ -27,6 +28,7 @@ import Distribution.Dev.Command            ( CommandActions(..)
                                            )
 import Distribution.Dev.Flags              ( Config, getCabalConfig
                                            , getVerbosity
+                                           , getExtras
                                            )
 import Distribution.Dev.InitPkgDb          ( initPkgDb )
 import qualified Distribution.Dev.RewriteCabalConfig as R
@@ -72,6 +74,7 @@ setup :: Sandbox KnownVersion -> ConfiguredProgram -> Config ->
          IO (Either String [String])
 setup s cabal flgs = do
   let v = getVerbosity flgs
+      extraPath = getExtras flgs
   cfgIn <- getCabalConfig flgs
   cVer <- CI.getFeatures v cabal
   let cfgOut = cabalConf s
@@ -79,16 +82,35 @@ setup s cabal flgs = do
     Left err -> return $ Left err
     Right features -> do
       cabalHome <- CI.configDir features
-      let rew = R.Rewrite cabalHome (sandbox s) (pkgConf s) (CI.needsQuotes features)
-      withUTF8FileContents cfgIn $ \cIn ->
-          do cfgRes <- R.rewriteCabalConfig rew cIn
-             case cfgRes of
-               Left err -> return $ Left $
-                  "Error processing cabal config file " ++ cfgIn ++ ": " ++ err
-               Right cOut -> do
-                  writeUTF8File cfgOut cOut
-                  args <- extraArgs v cfgOut (getVersion s)
-                  return $ Right args
+      extras <- getExtraFields extraPath 
+      case extras of
+        Left (err) | Just ep <- extraPath 
+                    -> return $ Left $ "Error processing extra cabal config file " ++ ep ++ ": " ++ err 
+        Right extraFields ->
+          withUTF8FileContents cfgIn $ \cIn ->
+              do 
+                 let rew = R.Rewrite{R.homeDir    = cabalHome
+                                    ,R.sandboxDir = sandbox s
+                                    ,R.packageDb  = pkgConf s
+                                    ,R.quoteInstallDirs = CI.needsQuotes features
+                                    ,R.extraFields = extraFields}
+                 cfgRes <- R.rewriteCabalConfig rew cIn
+                 case cfgRes of
+                   Left err -> return $ Left $
+                      "Error processing cabal config file " ++ cfgIn ++ ": " ++ err
+                   Right cOut -> do
+                      writeUTF8File cfgOut cOut
+                      args <- extraArgs v cfgOut (getVersion s)
+                      return $ Right args
+
+getExtraFields :: Maybe String -> IO (Either String [Field])
+getExtraFields (Just extraIn) = 
+      withUTF8FileContents extraIn $ \cIn ->
+       case readFields cIn of
+          ParseFailed err -> return . Left . show $ err
+          ParseOk _ fs    -> return . Right $ fs 
+    
+getExtraFields Nothing   = return . Right $ []
 
 extraArgs :: Verbosity -> FilePath -> PackageDbType -> IO [String]
 extraArgs v cfg pdb =

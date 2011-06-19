@@ -8,6 +8,7 @@ module Distribution.Dev.Flags
     , getSandbox
     , sandboxSpecified
     , getVerbosity
+    , getExtras
     , fromFlags
 
     , globalOpts
@@ -33,6 +34,7 @@ import System.Console.GetOpt  ( OptDescr(..), ArgOrder(..), ArgDescr(..)
 data GlobalFlag = Help
                 | Verbose (Maybe String)
                 | Sandbox FilePath
+                | Extra FilePath
                 | CabalConf FilePath
                 | Version Bool
                   deriving (Eq, Show)
@@ -43,6 +45,8 @@ globalOpts = [ Option "h?" ["help"] (NoArg Help) "Show help text"
                "The location of the development cabal sandbox (default: ./cabal-dev)"
              , Option "c" ["config"] (ReqArg CabalConf "PATH")
                "The location of the cabal-install config file (default: use included)"
+             , Option "e" ["config"] (ReqArg Extra "PATH")
+               "(Optional) Location of extra config-fil."
              , Option "v" ["verbose"] (OptArg Verbose "LEVEL")
                "Verbosity level: 0 (silent) - 3 (deafening)"
              , Option "" ["version"] (NoArg (Version False))
@@ -94,6 +98,9 @@ getCabalConfig = maybe defaultFileName return . cfgCabalConfig
 getVerbosity :: Config -> Verbosity
 getVerbosity = fromMaybe normal . cfgVerbosity
 
+getExtras :: Config -> Maybe String
+getExtras = cfgExtra
+
 defaultSandbox :: FilePath
 defaultSandbox = "cabal-dev"
 
@@ -106,16 +113,21 @@ sandboxSpecified = isJust . cfgSandbox
 data Config = Config { cfgVerbosity   :: Maybe Verbosity
                      , cfgCabalConfig :: Maybe FilePath
                      , cfgSandbox     :: Maybe FilePath
+                     , cfgExtra     :: Maybe FilePath
                      }
 
 instance Monoid Config where
-    mempty = Config Nothing Nothing Nothing
-    mappend (Config v1 c1 s1) (Config v2 c2 s2) =
-        Config (v2 `mplus` v1) (c2 `mplus` c1) (s2 `mplus` s1)
+    mempty = Config Nothing Nothing Nothing Nothing
+    mappend (Config v1 c1 s1 e1) (Config v2 c2 s2 e2) =
+        Config (v2 `mplus` v1) 
+               (c2 `mplus` c1) 
+               (s2 `mplus` s1)  
+               (e2 `mplus` e1)
 
 fromFlag :: GlobalFlag -> Config
 fromFlag (CabalConf p) = mempty { cfgCabalConfig = Just p }
 fromFlag (Sandbox s)   = mempty { cfgSandbox = Just s }
+fromFlag (Extra s)   = mempty { cfgExtra = Just s }
 fromFlag (Verbose s)   = mempty { cfgVerbosity = v }
     where
       v = case runReadE flagToVerbosity `fmap` s of
