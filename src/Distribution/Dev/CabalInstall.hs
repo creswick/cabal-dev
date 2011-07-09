@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Distribution.Dev.CabalInstall
        ( findOnPath
        , program
@@ -6,6 +7,10 @@ module Distribution.Dev.CabalInstall
        , needsQuotes
        , hasOnlyDependencies
        , configDir
+       , CabalCommand(..)
+       , commandToString
+       , stringToCommand
+       , allCommands
        )
 where
 
@@ -28,6 +33,8 @@ import Distribution.Simple.Utils ( debug )
 import Distribution.Text ( display, simpleParse )
 
 import System.Directory ( getAppUserDataDirectory )
+
+import Distribution.Dev.TH.DeriveCabalCommands ( deriveCabalCommands )
 
 -- XXX This is duplicated in Setup.hs
 -- |Definition of the cabal-install program
@@ -93,6 +100,8 @@ needsQuotes = (`withinRange` earlierVersion (mkVer [1,10])) . cfLibVersion
 hasOnlyDependencies :: CabalFeatures -> Bool
 hasOnlyDependencies =
   (`withinRange` orLaterVersion (mkVer [0, 10])) . cfExeVersion
+
+$(deriveCabalCommands)
 
 -- |What is the configuration directory for this cabal-install executable?
 

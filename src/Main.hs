@@ -21,28 +21,14 @@ import qualified Distribution.Dev.AddSource as AddSource
 import qualified Distribution.Dev.Ghci as Ghci
 import qualified Distribution.Dev.InvokeCabal as InvokeCabal
 import qualified Distribution.Dev.InstallDependencies as InstallDeps
+import qualified Distribution.Dev.CabalInstall as CI
 import Paths_cabal_dev ( version )
 
 allCommands :: [(String, CommandActions)]
 allCommands = [ ("add-source", AddSource.actions)
               , ("install-deps", InstallDeps.actions)
               , ("ghci", Ghci.actions)
-              , cabal "build"
-              , cabal "clean"
-              , cabal "configure"
-              , cabal "copy"
-              , cabal "fetch"
-              , cabal "haddock"
-              , cabal "info"
-              , cabal "init"
-              , cabal "install"
-              , cabal "list"
-              , cabal "register"
-              , cabal "unpack"
-              , cabal "update"
-              , cabal "hscolour"
-              , cabal "sdist"
-              ]
+              ] ++ map cabal CI.allCommands
     where
       cabal s = (s, InvokeCabal.actions s)
 
