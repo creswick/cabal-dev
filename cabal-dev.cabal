@@ -125,7 +125,12 @@ Executable cabal-dev
       process >= 1.0 && < 1.1,
       tar >= 0.3 && < 0.4,
       zlib >= 0.5 && < 0.6,
-      template-haskell == 2.5.*
+
+      -- Template haskell is special: the compiler will die if a
+      -- version other than the one that is shipped with the compiler
+      -- is used. Here, we don't constrain the version and hope that
+      -- there will be only one.
+      template-haskell
 
   if os(windows)
      build-depends: Win32 >= 2.1  && < 2.3
