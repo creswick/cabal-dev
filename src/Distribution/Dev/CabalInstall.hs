@@ -8,12 +8,18 @@ module Distribution.Dev.CabalInstall
        , hasOnlyDependencies
        , configDir
        , CabalCommand(..)
+       , LongOption(..)
+       , matchOption
        , commandToString
        , stringToCommand
        , allCommands
+       , commandOptions
+       , supportsOption
+       , supportedOptions
        )
 where
 
+import Data.List ( tails, isPrefixOf )
 import Control.Applicative ( (<$>) )
 import Distribution.Version ( Version(..), withinRange
                             , earlierVersion, orLaterVersion )
@@ -34,7 +40,8 @@ import Distribution.Text ( display, simpleParse )
 
 import System.Directory ( getAppUserDataDirectory )
 
-import Distribution.Dev.TH.DeriveCabalCommands ( deriveCabalCommands )
+import Distribution.Dev.TH.DeriveCabalCommands
+    ( deriveCabalCommands, LongOption(..) )
 
 -- XXX This is duplicated in Setup.hs
 -- |Definition of the cabal-install program
@@ -102,6 +109,20 @@ hasOnlyDependencies =
   (`withinRange` orLaterVersion (mkVer [0, 10])) . cfExeVersion
 
 $(deriveCabalCommands)
+
+supportsOption :: CabalCommand -> String -> Bool
+supportsOption cc s = any (`matchOption` s) $ supportedOptions cc
+
+matchOption :: LongOption -> String -> Bool
+matchOption (LongOption s) = (== s)
+matchOption (ProgBefore s) = any (== ('-':s)) . tails
+matchOption (ProgAfter s) = ((s ++ "-") `isPrefixOf`)
+
+supportedOptions :: CabalCommand -> [LongOption]
+supportedOptions cc = commonOptions ++ commandOptions cc
+
+commonOptions :: [LongOption]
+commonOptions = [LongOption "config-file"]
 
 -- |What is the configuration directory for this cabal-install executable?
 

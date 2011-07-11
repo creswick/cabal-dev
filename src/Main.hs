@@ -30,7 +30,7 @@ allCommands = [ ("add-source", AddSource.actions)
               , ("ghci", Ghci.actions)
               ] ++ map cabal CI.allCommands
     where
-      cabal s = (s, InvokeCabal.actions s)
+      cabal s = (CI.commandToString s, InvokeCabal.actions s)
 
 printVersion :: IO ()
 printVersion = do

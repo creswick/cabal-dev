@@ -1,5 +1,5 @@
 Name:                cabal-dev
-Version:             0.7.4.1
+Version:             0.8
 Synopsis:            Manage sandboxed Haskell build environments
 
 Description:         cabal-dev is a tool for managing development builds of
@@ -25,7 +25,7 @@ Description:         cabal-dev is a tool for managing development builds of
                      @cabal-dev add-source@ also supports importing tarballs
                      into a local cabal repository.
                      .
-                     This tool has been tested with GHC 6.8-7.0.1.
+                     This tool has been tested with GHC 6.8-7.0.3.
 
 License:             BSD3
 License-file:        LICENSE
