@@ -113,13 +113,13 @@ $(deriveCabalCommands)
 supportsOption :: CabalCommand -> String -> Bool
 supportsOption cc s = any (`matchOption` s) $ supportedOptions cc
 
+supportedOptions :: CabalCommand -> [LongOption]
+supportedOptions cc = commonOptions ++ commandOptions cc
+
 matchOption :: LongOption -> String -> Bool
 matchOption (LongOption s) = (== s)
 matchOption (ProgBefore s) = any (== ('-':s)) . tails
 matchOption (ProgAfter s) = ((s ++ "-") `isPrefixOf`)
-
-supportedOptions :: CabalCommand -> [LongOption]
-supportedOptions cc = commonOptions ++ commandOptions cc
 
 commonOptions :: [LongOption]
 commonOptions = [LongOption "config-file"]

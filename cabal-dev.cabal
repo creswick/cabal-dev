@@ -135,13 +135,15 @@ Executable cabal-dev
 
   Other-modules:
     Distribution.Dev.AddSource,
-    Distribution.Dev.Sandbox,
-    Distribution.Dev.Command,
     Distribution.Dev.CabalInstall,
+    Distribution.Dev.Command,
     Distribution.Dev.Flags,
     Distribution.Dev.Ghci,
-    Distribution.Dev.InvokeCabal,
-    Distribution.Dev.InstallDependencies,
-    Distribution.Dev.RewriteCabalConfig,
     Distribution.Dev.InitPkgDb,
+    Distribution.Dev.InstallDependencies,
+    Distribution.Dev.InterrogateCabalInstall,
+    Distribution.Dev.InvokeCabal,
+    Distribution.Dev.RewriteCabalConfig,
+    Distribution.Dev.Sandbox,
+    Distribution.Dev.TH.DeriveCabalCommands,
     Distribution.Dev.Utilities

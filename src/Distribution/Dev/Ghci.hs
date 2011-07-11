@@ -3,7 +3,7 @@ module Distribution.Dev.Ghci
 where
 
 import Distribution.Dev.Command ( CommandActions(..), CommandResult(..) )
-import Distribution.Dev.Flags ( Config, getVerbosity, getSandbox )
+import Distribution.Dev.Flags ( Config, getVerbosity )
 import Distribution.Dev.InitPkgDb ( initPkgDb )
 import Distribution.Dev.Sandbox ( pkgConf, Sandbox, KnownVersion, resolveSandbox )
 import Distribution.Simple.Program ( Program( programFindVersion
@@ -21,7 +21,6 @@ import Distribution.Simple.Program ( Program( programFindVersion
 import Distribution.Simple.Utils ( debug )
 import Distribution.Text ( display )
 import System.Console.GetOpt  ( OptDescr )
-import System.FilePath ((</>))
 
 actions :: CommandActions
 actions = CommandActions
