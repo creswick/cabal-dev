@@ -8,13 +8,15 @@ module Distribution.Dev.CabalInstall
        , hasOnlyDependencies
        , configDir
        , CabalCommand(..)
-       , LongOption(..)
-       , matchOption
+       , Option(..)
+       , OptionName(..)
+       , ArgType(..)
+       , matchLongOption
        , commandToString
        , stringToCommand
        , allCommands
        , commandOptions
-       , supportsOption
+       , supportsLongOption
        , supportedOptions
        )
 where
@@ -40,8 +42,9 @@ import Distribution.Text ( display, simpleParse )
 
 import System.Directory ( getAppUserDataDirectory )
 
+import Distribution.Dev.InterrogateCabalInstall ( Option(..), OptionName(..), ArgType(..) )
 import Distribution.Dev.TH.DeriveCabalCommands
-    ( deriveCabalCommands, LongOption(..) )
+    ( deriveCabalCommands )
 
 -- XXX This is duplicated in Setup.hs
 -- |Definition of the cabal-install program
@@ -110,19 +113,23 @@ hasOnlyDependencies =
 
 $(deriveCabalCommands)
 
-supportsOption :: CabalCommand -> String -> Bool
-supportsOption cc s = any (`matchOption` s) $ supportedOptions cc
+supportsLongOption :: CabalCommand -> String -> Bool
+supportsLongOption cc s = any ((`matchLongOption` s) . optionName) $ supportedOptions cc
 
-supportedOptions :: CabalCommand -> [LongOption]
+optionName :: Option -> OptionName
+optionName (Option n _) = n
+
+supportedOptions :: CabalCommand -> [Option]
 supportedOptions cc = commonOptions ++ commandOptions cc
 
-matchOption :: LongOption -> String -> Bool
-matchOption (LongOption s) = (== s)
-matchOption (ProgBefore s) = any (== ('-':s)) . tails
-matchOption (ProgAfter s) = ((s ++ "-") `isPrefixOf`)
+matchLongOption :: OptionName -> String -> Bool
+matchLongOption (Short _) = const False
+matchLongOption (LongOption s) = (== s)
+matchLongOption (ProgBefore s) = any (== ('-':s)) . tails
+matchLongOption (ProgAfter s) = ((s ++ "-") `isPrefixOf`)
 
-commonOptions :: [LongOption]
-commonOptions = [LongOption "config-file"]
+commonOptions :: [Option]
+commonOptions = [Option (LongOption "config-file") Req]
 
 -- |What is the configuration directory for this cabal-install executable?
 

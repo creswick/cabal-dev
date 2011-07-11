@@ -2,7 +2,6 @@ module Distribution.Dev.TH.DeriveCabalCommands
     ( getCabalCommands
     , deriveCabalCommands
     , mkCabalCommandsDef
-    , LongOption(..)
     , optParseFlags
     )
 where
@@ -11,15 +10,30 @@ import Control.Applicative ( (<$>) )
 import Data.Char ( toUpper  )
 import Language.Haskell.TH
 import Distribution.Dev.InterrogateCabalInstall
-    ( LongOption(..), CabalCommandStr, ccStr, optParseFlags
-    , getCabalCommandHelp, getCabalCommands )
+    ( Option(..), OptionName(..), ArgType(..), CabalCommandStr, ccStr
+    , optParseFlags, getCabalCommandHelp, getCabalCommands )
 
-mkLO :: LongOption -> Exp
-mkLO lo = let (cn, o) = case lo of
-                          LongOption s -> ("LongOption", s)
-                          ProgBefore s -> ("ProgBefore", s)
-                          ProgAfter  s -> ("ProgAfter",  s)
-          in AppE (ConE (mkName cn)) $ LitE $ StringL o
+mkLO :: Option -> Exp
+mkLO (Option on ty) =
+    let (cn, o) = case on of
+                    Short c -> ("Short", CharL c)
+                    LongOption s -> ("LongOption", StringL s)
+                    ProgBefore s -> ("ProgBefore", StringL s)
+                    ProgAfter  s -> ("ProgAfter",  StringL s)
+
+        tyE = ConE $ mkName $
+              case ty of
+                Req -> "Req"
+                Opt -> "Opt"
+                NoArg -> "NoArg"
+
+        nE = appC cn $ LitE o
+
+        optC n t = AppE (appC "Option" n) t
+
+        appC n = AppE $ ConE $ mkName n
+
+    in optC nE tyE
 
 mkSupportedOptionClause :: CabalCommandStr -> String -> Clause
 mkSupportedOptionClause cStr helpOutput =
@@ -30,7 +44,7 @@ mkSupportedOptionClause cStr helpOutput =
 mkGetSupportedOptions :: [(CabalCommandStr, String)] -> [Dec]
 mkGetSupportedOptions cs =
     let n = mkName "commandOptions"
-    in [ SigD n $ ccT ~~> AppT ListT (ConT (mkName "LongOption"))
+    in [ SigD n $ ccT ~~> AppT ListT (ConT (mkName "Option"))
        , FunD n $ map (uncurry mkSupportedOptionClause) cs
        ]
 

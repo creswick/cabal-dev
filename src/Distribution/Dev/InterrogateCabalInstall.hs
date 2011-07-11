@@ -8,7 +8,9 @@ module Distribution.Dev.InterrogateCabalInstall
     ( CabalCommandStr
     , ccStr
     , parseCabalHelp
-    , LongOption(..)
+    , Option(..)
+    , OptionName(..)
+    , ArgType(..)
     , optParseFlags
     , getCabalCommandHelp
     , getCabalHelp
@@ -45,17 +47,22 @@ parseCabalHelp = map (CabalCommandStr . extractName) .
 -- XXX: this should also record whether an argument is required.
 --
 -- XXX: this should also parse short options
-data LongOption
+data OptionName
     = LongOption String
     | ProgBefore String
     | ProgAfter  String
+    | Short      Char
       deriving (Eq, Show)
+
+data Option = Option OptionName ArgType deriving (Show, Eq)
+
+data ArgType = Req | Opt | NoArg deriving (Eq, Show)
 
 -- |Parse the output of 'cabal foo --help' to determine the valid
 -- options for 'cabal foo'
 --
 -- Note that the --config-file flag is never documented.
-optParseFlags :: String -> [LongOption]
+optParseFlags :: String -> [Option]
 optParseFlags = extractLongOptions . findOptionLines . lines
     where
       findOptionLines = takeWhile (not . all isSpace) .
@@ -67,28 +74,47 @@ optParseFlags = extractLongOptions . findOptionLines . lines
       extractLongOptions ls = do
         i <- leftmostDoubleDash ls
         guard $ checkLoc i ls
-        l@('-':'-':_) <- drop (i + 1) <$> ls
-        parseDoubleOpts l
+        (soptStr, (' ':l@('-':'-':_))) <- splitAt i <$> ls
+        let (doubleOpts, tys) = unzip $ parseDoubleOpts l
+            ty = case tys of
+                   (t:_) -> t
+                   []    -> NoArg
+        map (\n -> Option n ty) $ parseSingleOpts soptStr ++ doubleOpts
 
+      -- Check that the spot that we picked to split is either the
+      -- start of a long option description or whitespace
       checkLoc i = all (`elem` [" --", "   "]) . map (take 3 . drop i)
 
       findDoubleDash n (' ':'-':'-':_) = Just n
       findDoubleDash _ []              = Nothing
       findDoubleDash n (_:xs)          = let n' = n + 1
                                          in n' `seq` findDoubleDash n' xs
+
       parseDoubleOpts ('-':'-':xs) = do
         (optName, rest) <- plainOpt xs ++ progBefore xs ++ progAfter xs
-        let eoc = case take 2 rest of
-                    ['=',_] -> dropWhile isAsciiUpper $ drop 1 rest
-                    "[=" -> drop 1 $ dropWhile isAsciiUpper $ drop 2 rest
-                    _   -> rest
+        let (eoc, ty) =
+                case take 2 rest of
+                  ['=',_] -> (dropWhile isAsciiUpper $ drop 1 rest, Req)
+                  "[="    -> (drop 1 $ dropWhile isAsciiUpper $ drop 2 rest, Opt)
+                  _       -> (rest, NoArg)
+            opt = (optName, ty)
         case eoc of
-          (',':' ':rest') -> optName:parseDoubleOpts rest'
-          (' ':_)         -> [optName]
-          []              -> [optName]
+          (',':' ':rest') -> opt:parseDoubleOpts rest'
+          (' ':_)         -> [opt]
+          []              -> [opt]
           _               -> []
 
       parseDoubleOpts _ = []
+
+      parseSingleOpts s =
+          case dropWhile isSpace s of
+            ('-':c:' ':rest)
+                | isAsciiLower c || isAsciiUpper c ->
+                    Short c :
+                    case rest of
+                      (',':' ':s') -> parseSingleOpts s'
+                      _            -> []
+            _                                      -> []
 
       optChar c = ord c < 128 && (isAsciiLower c || c == '-')
 
