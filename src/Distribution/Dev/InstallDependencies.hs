@@ -30,7 +30,7 @@ installDependencies flgs pkgNames = do
   s <- initPkgDb v =<< resolveSandbox flgs
   (cabal, _) <- requireProgram v CI.program emptyProgramDb
   eFeatures <- CI.getFeatures v cabal
-  setupRes <- setup s cabal flgs
+  setupRes <- setup s cabal flgs CI.Install
   case (setupRes, eFeatures) of
     (Left err, _) -> return $ CommandError err
     (_, Left err) -> return $ CommandError err

@@ -42,35 +42,36 @@ import Distribution.Dev.Sandbox            ( resolveSandbox
                                            )
 import Distribution.Dev.Utilities          ( ensureAbsolute )
 
-actions :: String -> CommandActions
-actions act = CommandActions
+actions :: CI.CabalCommand -> CommandActions
+actions cc = CommandActions
               { cmdDesc = "Invoke cabal-install with the development configuration"
-              , cmdRun = \flgs _ args -> invokeCabal flgs (act:args)
+              , cmdRun = \flgs _ args -> invokeCabal flgs cc args
               , cmdOpts = [] :: [OptDescr ()]
               , cmdPassFlags = True
               }
 
-invokeCabal :: Config -> [String] -> IO CommandResult
-invokeCabal flgs args = do
+invokeCabal :: Config -> CI.CabalCommand -> [String] -> IO CommandResult
+invokeCabal flgs cc args = do
   let v = getVerbosity flgs
   s <- initPkgDb v =<< resolveSandbox flgs
   cabal <- CI.findOnPath v
-  res <- setup s cabal flgs
+  res <- setup s cabal flgs cc
   case res of
     Left err -> return $ CommandError err
     Right args' -> do
              runProgram v cabal $ args' ++ args
              return CommandOk
 
-cabalArgs :: ConfiguredProgram -> Config -> IO (Either String [String])
-cabalArgs cabal flgs = do
+cabalArgs :: ConfiguredProgram -> Config -> CI.CabalCommand
+          -> IO (Either String [String])
+cabalArgs cabal flgs cc = do
   let v = getVerbosity flgs
   s <- initPkgDb v =<< resolveSandbox flgs
-  setup s cabal flgs
+  setup s cabal flgs cc
 
 setup :: Sandbox KnownVersion -> ConfiguredProgram -> Config ->
-         IO (Either String [String])
-setup s cabal flgs = do
+         CI.CabalCommand -> IO (Either String [String])
+setup s cabal flgs cc = do
   let v = getVerbosity flgs
   cfgIn <- getCabalConfig flgs
   cVer <- CI.getFeatures v cabal
@@ -87,15 +88,28 @@ setup s cabal flgs = do
                   "Error processing cabal config file " ++ cfgIn ++ ": " ++ err
                Right cOut -> do
                   writeUTF8File cfgOut cOut
-                  args <- extraArgs v cfgOut (getVersion s)
+                  (gOpts, cOpts) <- extraArgs v cfgOut (getVersion s)
+                  let gFlags = map toArg gOpts
+                      cFlags = map toArg $
+                               filter (CI.supportsOption cc . fst) cOpts
+                      args = concat [ gFlags, [CI.commandToString cc], cFlags ]
+                  debug v $ "Complete arguments to cabal-install: " ++ show args
                   return $ Right args
 
-extraArgs :: Verbosity -> FilePath -> PackageDbType -> IO [String]
+toArg :: Option -> String
+toArg (a, mb) = showString "--" .
+                showString a $ maybe "" ('=':) mb
+
+-- option name, value
+type Option = (String, Maybe String)
+type Options = [Option]
+
+extraArgs :: Verbosity -> FilePath -> PackageDbType -> IO (Options, Options)
 extraArgs v cfg pdb =
     do pdbArgs <- getPdbArgs
-       return $ [cfgFileArg, verbosityArg] ++ pdbArgs
+       return ([cfgFileArg], verbosityArg:pdbArgs)
     where
-      longArg s = showString "--" . showString s . ('=':)
+      longArg s = (,) s . Just
       cfgFileArg = longArg "config-file" cfg
       verbosityArg = longArg "verbose" $ showForCabal v
       withGhcPkg = longArg "with-ghc-pkg"
@@ -107,7 +121,7 @@ extraArgs v cfg pdb =
                      debug v $ "Using GHC 6.8 compatibility wrapper for Cabal shortcoming"
                      (ghcPkgCompat, _) <-
                          requireProgram v ghcPkgCompatProgram emptyProgramConfiguration
-                     return $ [ longArg "ghc-pkg-options" $ withGhcPkg loc
+                     return $ [ longArg "ghc-pkg-options" $ toArg $ withGhcPkg loc
                               , withGhcPkg $ locationPath $
                                 programLocation ghcPkgCompat
                               ]
