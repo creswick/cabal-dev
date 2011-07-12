@@ -24,13 +24,19 @@ import qualified Distribution.Dev.InstallDependencies as InstallDeps
 import qualified Distribution.Dev.CabalInstall as CI
 import Paths_cabal_dev ( version )
 
-allCommands :: [(String, CommandActions)]
-allCommands = [ ("add-source", AddSource.actions)
-              , ("install-deps", InstallDeps.actions)
-              , ("ghci", Ghci.actions)
-              ] ++ map cabal CI.allCommands
+cabalDevCommands :: [(String, CommandActions)]
+cabalDevCommands = [ ("add-source", AddSource.actions)
+                   , ("install-deps", InstallDeps.actions)
+                   , ("ghci", Ghci.actions)
+                   ]
+
+cabalInstallCommands :: [(String, CommandActions)]
+cabalInstallCommands = map cabal CI.allCommands
     where
       cabal s = (CI.commandToString s, InvokeCabal.actions s)
+
+allCommands :: [(String, CommandActions)]
+allCommands = cabalDevCommands ++ cabalInstallCommands
 
 printVersion :: IO ()
 printVersion = do
@@ -93,8 +99,10 @@ globalUsage = do
           , "Usage: " ++ progName ++ " <command>"
           , ""
           , "Where <command> is one of:"
-          ] ++ map ("  " ++) allCommandNames ++
+          ] ++ map (("  " ++) . fst) cabalDevCommands ++
           [ ""
+          , "or any cabal-install command (see cabal --help for documentation)."
+          , ""
           , "Options:"
           ]
   return $ usageInfo preamble globalOpts
