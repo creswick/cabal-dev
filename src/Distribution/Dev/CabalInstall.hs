@@ -21,6 +21,7 @@ module Distribution.Dev.CabalInstall
        )
 where
 
+import Data.Maybe ( fromMaybe )
 import Data.List ( tails, isPrefixOf )
 import Control.Applicative ( (<$>) )
 import Distribution.Version ( Version(..), withinRange
@@ -42,22 +43,23 @@ import Distribution.Text ( display, simpleParse )
 
 import System.Directory ( getAppUserDataDirectory )
 
-import Distribution.Dev.InterrogateCabalInstall ( Option(..), OptionName(..), ArgType(..) )
+import Distribution.Dev.InterrogateCabalInstall
+    ( Option(..), OptionName(..), ArgType(..) )
 import Distribution.Dev.TH.DeriveCabalCommands
     ( deriveCabalCommands )
 
 -- XXX This is duplicated in Setup.hs
 -- |Definition of the cabal-install program
-program :: Program
-program =
-    (simpleProgram "cabal") { programFindVersion =
+program :: Maybe String -> Program
+program p =
+    (simpleProgram $ fromMaybe "cabal" p) { programFindVersion =
                                   findProgramVersion "--numeric-version" id
                             }
 
 -- |Find cabal-install on the user's PATH
-findOnPath :: Verbosity -> IO ConfiguredProgram
-findOnPath v = do
-  (cabal, _) <- requireProgram v program emptyProgramConfiguration
+findOnPath :: Verbosity -> Maybe FilePath -> IO ConfiguredProgram
+findOnPath v ci = do
+  (cabal, _) <- requireProgram v (program ci) emptyProgramConfiguration
   debug v $ concat [ "Using cabal-install "
                    , maybe "(unknown version)" display $ programVersion cabal
                    , " at "

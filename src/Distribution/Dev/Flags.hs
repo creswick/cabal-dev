@@ -10,6 +10,7 @@ module Distribution.Dev.Flags
     , getVerbosity
     , fromFlags
     , passthroughArgs
+    , cfgCabalInstall
 
     , globalOpts
     , parseGlobalFlags
@@ -39,6 +40,7 @@ data GlobalFlag = Help
                 | CabalConf FilePath
                 | Version Bool
                 | CabalInstallArg String
+                | WithCabalInstall FilePath
                   deriving (Eq, Show)
 
 globalOpts :: [OptDescr GlobalFlag]
@@ -57,6 +59,9 @@ globalOpts = [ Option "h?" ["help"] (NoArg Help) "Show help text"
                "Pass this argument through to cabal-install untouched (in " ++
                "case an argument to cabal-install conflicts with an " ++
                "argument to cabal-dev"
+             , Option "" ["with-cabal-install"] (ReqArg WithCabalInstall "PATH") $
+               "The location of the specific cabal-install to invoke " ++
+               "(defaults to looking on your PATH)"
              ]
 
 cabalArgToOptDescr :: CI.Option -> OptDescr GlobalFlag
@@ -144,17 +149,19 @@ sandboxSpecified = isJust . cfgSandbox
 data Config = Config { cfgVerbosity   :: Maybe Verbosity
                      , cfgCabalConfig :: Maybe FilePath
                      , cfgSandbox     :: Maybe FilePath
+                     , cfgCabalInstall :: Maybe FilePath
                      , passthroughArgs :: [String]
                      }
 
 instance Monoid Config where
-    mempty = Config Nothing Nothing Nothing []
-    mappend (Config v1 c1 s1 a1) (Config v2 c2 s2 a2) =
-        Config (v2 `mplus` v1) (c2 `mplus` c1) (s2 `mplus` s1) (a1 ++ a2)
+    mempty = Config Nothing Nothing Nothing Nothing []
+    mappend (Config v1 c1 s1 ci1 a1) (Config v2 c2 s2 ci2 a2) =
+        Config (v2 `mplus` v1) (c2 `mplus` c1) (s2 `mplus` s1) (ci1 `mplus` ci2) (a1 ++ a2)
 
 fromFlag :: GlobalFlag -> Config
 fromFlag (CabalConf p) = mempty { cfgCabalConfig = Just p }
 fromFlag (Sandbox s)   = mempty { cfgSandbox = Just s }
+fromFlag (WithCabalInstall p) = mempty { cfgCabalInstall = Just p }
 fromFlag (Verbose s)   = mempty { cfgVerbosity = v }
     where
       v = case runReadE flagToVerbosity `fmap` s of

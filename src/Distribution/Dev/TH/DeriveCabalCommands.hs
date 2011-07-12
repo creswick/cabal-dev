@@ -50,9 +50,8 @@ mkGetSupportedOptions progs cs =
 
 mkGetSupportedOptionsIO :: [CabalCommandStr] -> IO [Dec]
 mkGetSupportedOptionsIO ccs =
-    do print =<< getCabalProgs
-       (mkGetSupportedOptions <$> getCabalProgs)
-         <*> (zip ccs <$> mapM getCabalCommandHelp ccs)
+    (mkGetSupportedOptions <$> getCabalProgs)
+    <*> (zip ccs <$> mapM getCabalCommandHelp ccs)
 
 mkCabalCommandsDef :: [CabalCommandStr] -> IO [Dec]
 mkCabalCommandsDef strs =

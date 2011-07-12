@@ -4,7 +4,7 @@ where
 
 import System.Console.GetOpt ( OptDescr(..) )
 import Distribution.Dev.Command ( CommandActions(..), CommandResult(..) )
-import Distribution.Dev.Flags ( Config, getVerbosity )
+import Distribution.Dev.Flags ( Config, getVerbosity, cfgCabalInstall )
 import Distribution.Dev.Sandbox ( resolveSandbox )
 import Distribution.Dev.InitPkgDb ( initPkgDb )
 import Distribution.Dev.InvokeCabal ( setup )
@@ -28,7 +28,7 @@ installDependencies :: Config -> [String] -> IO CommandResult
 installDependencies flgs pkgNames = do
   let v = getVerbosity flgs
   s <- initPkgDb v =<< resolveSandbox flgs
-  (cabal, _) <- requireProgram v CI.program emptyProgramDb
+  (cabal, _) <- requireProgram v (CI.program $ cfgCabalInstall flgs) emptyProgramDb
   eFeatures <- CI.getFeatures v cabal
   setupRes <- setup s cabal flgs CI.Install
   case (setupRes, eFeatures) of

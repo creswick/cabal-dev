@@ -29,8 +29,6 @@ import Data.Maybe ( mapMaybe )
 import Distribution.Simple.Utils ( rawSystemStdout )
 import Distribution.Verbosity ( verbose )
 
-import Debug.Trace ( traceShow )
-
 -- |A cabal-install command name
 newtype CabalCommandStr = CabalCommandStr { ccStr :: String }
 
@@ -125,7 +123,7 @@ optParseFlags progs = extractLongOptions . findOptionLines . lines
       parseDoubleOpts _ = []
 
       parseSingleOpts s =
-          traceShow s $ case dropWhile isSpace s of
+          case dropWhile isSpace s of
             ('-':c:rest)
                 | isAsciiLower c || isAsciiUpper c ->
                     case rest of

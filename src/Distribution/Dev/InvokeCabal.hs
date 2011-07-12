@@ -27,6 +27,7 @@ import Distribution.Dev.Command            ( CommandActions(..)
                                            )
 import Distribution.Dev.Flags              ( Config, getCabalConfig
                                            , getVerbosity, passthroughArgs
+                                           , cfgCabalInstall
                                            )
 import Distribution.Dev.InitPkgDb          ( initPkgDb )
 import qualified Distribution.Dev.RewriteCabalConfig as R
@@ -54,7 +55,7 @@ invokeCabal :: Config -> CI.CabalCommand -> [String] -> IO CommandResult
 invokeCabal flgs cc args = do
   let v = getVerbosity flgs
   s <- initPkgDb v =<< resolveSandbox flgs
-  cabal <- CI.findOnPath v
+  cabal <- CI.findOnPath v $ cfgCabalInstall flgs
   res <- setup s cabal flgs cc
   case res of
     Left err -> return $ CommandError err
