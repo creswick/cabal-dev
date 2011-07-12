@@ -21,7 +21,7 @@ where
 import Control.Monad          ( mplus )
 import Data.Monoid            ( Monoid(..) )
 import Data.List              ( intercalate )
-import Data.Maybe             ( fromMaybe, isJust )
+import Data.Maybe             ( fromMaybe, isJust, maybeToList, listToMaybe )
 import Data.Foldable          ( foldMap )
 import System.FilePath        ( (</>) )
 import Distribution.ReadE     ( runReadE )
@@ -30,6 +30,8 @@ import Paths_cabal_dev        ( getDataFileName )
 import System.Console.GetOpt  ( OptDescr(..), ArgOrder(..), ArgDescr(..)
                               , getOpt', getOpt
                               )
+
+import qualified Distribution.Dev.CabalInstall as CI
 
 data GlobalFlag = Help
                 | Verbose (Maybe String)
@@ -56,6 +58,32 @@ globalOpts = [ Option "h?" ["help"] (NoArg Help) "Show help text"
                "case an argument to cabal-install conflicts with an " ++
                "argument to cabal-dev"
              ]
+
+cabalArgToOptDescr :: CI.Option -> OptDescr GlobalFlag
+cabalArgToOptDescr (CI.Option cn ty) =
+    Option shortName longName parse "<internal implementation>"
+    where
+      shortName = case cn of
+                    CI.Short c -> [c]
+                    _          -> []
+
+      longName  = case cn of
+                    CI.LongOption s -> [s]
+                    _               -> []
+
+      optName = case cn of
+                  CI.Short c      -> ['-',c]
+                  CI.LongOption s -> '-':'-':s
+
+      noArg = NoArg $ CabalInstallArg optName
+      withArg s = case cn of
+                    CI.Short _      -> optName ++ s
+                    CI.LongOption _ -> optName ++ '=':s
+      parse =
+          case ty of
+            CI.NoArg -> noArg
+            CI.Req -> ReqArg (CabalInstallArg . withArg) "INTERNAL"
+            CI.Opt -> OptArg (CabalInstallArg . maybe optName withArg) "INTERNAL"
 
 getOpt'' :: [OptDescr a] -> [String] -> ([a], [String], [String])
 getOpt'' opts args =
@@ -87,7 +115,11 @@ getOpt'' opts args =
                     "Impossible outcome from break: " ++ show impossible
 
 parseGlobalFlags :: [String] -> ([GlobalFlag], [String], [String])
-parseGlobalFlags = getOpt'' globalOpts
+parseGlobalFlags args = getOpt'' (globalOpts ++ defs) args
+    where
+      cmd = CI.stringToCommand =<< listToMaybe (dropWhile isOpt args)
+      defs = map cabalArgToOptDescr $ CI.commandOptions =<< maybeToList cmd
+      isOpt = (== "-") . take 1
 
 helpRequested :: [GlobalFlag] -> Bool
 helpRequested = (Help `elem`)

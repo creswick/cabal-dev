@@ -125,8 +125,6 @@ supportedOptions cc = commonOptions ++ commandOptions cc
 matchLongOption :: OptionName -> String -> Bool
 matchLongOption (Short _) = const False
 matchLongOption (LongOption s) = (== s)
-matchLongOption (ProgBefore s) = any (== ('-':s)) . tails
-matchLongOption (ProgAfter s) = ((s ++ "-") `isPrefixOf`)
 
 commonOptions :: [Option]
 commonOptions = [Option (LongOption "config-file") Req]

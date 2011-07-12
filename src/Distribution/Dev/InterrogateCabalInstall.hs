@@ -15,6 +15,9 @@ module Distribution.Dev.InterrogateCabalInstall
     , getCabalCommandHelp
     , getCabalHelp
     , getCabalCommands
+    , Program
+    , progStr
+    , getCabalProgs
     )
 where
 
@@ -26,8 +29,12 @@ import Data.Maybe ( mapMaybe )
 import Distribution.Simple.Utils ( rawSystemStdout )
 import Distribution.Verbosity ( verbose )
 
+import Debug.Trace ( traceShow )
+
 -- |A cabal-install command name
 newtype CabalCommandStr = CabalCommandStr { ccStr :: String }
+
+newtype Program = Program { progStr :: String } deriving (Show, Eq)
 
 -- |Get the command names from a String containing the output of
 -- cabal-install --help
@@ -49,21 +56,32 @@ parseCabalHelp = map (CabalCommandStr . extractName) .
 -- XXX: this should also parse short options
 data OptionName
     = LongOption String
-    | ProgBefore String
-    | ProgAfter  String
     | Short      Char
       deriving (Eq, Show)
+
+progBeforeOpt :: [Program] -> String -> [OptionName]
+progBeforeOpt progs s = map (\p -> LongOption $ progStr p ++ '-':s) progs
+
+progAfterOpt :: [Program] -> String -> [OptionName]
+progAfterOpt progs s = map (LongOption . (s ++) . ('-':) . progStr) progs
 
 data Option = Option OptionName ArgType deriving (Show, Eq)
 
 data ArgType = Req | Opt | NoArg deriving (Eq, Show)
 
+parseProgs :: String -> [Program]
+parseProgs = map Program . words . concat . takeWhile (not . all isSpace) .
+             drop 1 . dropWhile (not . isProgIntro) . lines
+    where
+      isProgIntro s = (reverse "can be used with the following programs:")
+                      `isPrefixOf` (dropWhile isSpace $ reverse s)
+
 -- |Parse the output of 'cabal foo --help' to determine the valid
 -- options for 'cabal foo'
 --
 -- Note that the --config-file flag is never documented.
-optParseFlags :: String -> [Option]
-optParseFlags = extractLongOptions . findOptionLines . lines
+optParseFlags :: [Program] -> String -> [Option]
+optParseFlags progs = extractLongOptions . findOptionLines . lines
     where
       findOptionLines = takeWhile (not . all isSpace) .
                         drop 1 .
@@ -107,12 +125,13 @@ optParseFlags = extractLongOptions . findOptionLines . lines
       parseDoubleOpts _ = []
 
       parseSingleOpts s =
-          case dropWhile isSpace s of
-            ('-':c:' ':rest)
+          traceShow s $ case dropWhile isSpace s of
+            ('-':c:rest)
                 | isAsciiLower c || isAsciiUpper c ->
-                    Short c :
                     case rest of
-                      (',':' ':s') -> parseSingleOpts s'
+                      (',':' ':s') -> Short c:parseSingleOpts s'
+                      []           -> [Short c]
+                      (' ':_)      -> [Short c]
                       _            -> []
             _                                      -> []
 
@@ -125,12 +144,15 @@ optParseFlags = extractLongOptions . findOptionLines . lines
       progBefore s = case break (== '-') s of
                        ("PROG", '-':rest) ->
                            do (LongOption n, rest') <- plainOpt rest
-                              return (ProgBefore n, rest')
+                              o <- progBeforeOpt progs n
+                              return (o, rest')
                        _ -> []
+
       progAfter s = do (LongOption n, rest) <- plainOpt s
                        guard $ take 1 (reverse n) == "-"
                        case break (not . isAsciiUpper) rest of
-                         ("PROG", rest') -> return (ProgAfter $ init n, rest')
+                         ("PROG", rest') -> do o <- progAfterOpt progs $ init n
+                                               return (o, rest')
                          _               -> []
 
 -- |Obtain the --help output for a particular cabal-install command
@@ -145,3 +167,6 @@ getCabalHelp = rawSystemStdout verbose "cabal" ["--help"]
 -- supports.
 getCabalCommands :: IO [CabalCommandStr]
 getCabalCommands = parseCabalHelp <$> getCabalHelp
+
+getCabalProgs :: IO [Program]
+getCabalProgs = parseProgs <$> getCabalCommandHelp (CabalCommandStr "install")

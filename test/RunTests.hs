@@ -27,7 +27,7 @@ import Distribution.Simple.Utils ( withTempDirectory, info )
 import Distribution.Text ( simpleParse, display )
 import Distribution.Verbosity ( normal, Verbosity, showForCabal, verbose )
 import Distribution.Version ( Version(..) )
-import Distribution.Dev.Flags ( parseGlobalFlags )
+import Distribution.Dev.Flags ( parseGlobalFlags, GlobalFlag(CabalInstallArg) )
 import Distribution.Dev.InitPkgDb ( initPkgDb )
 import Distribution.Dev.Sandbox ( newSandbox, pkgConf, Sandbox, KnownVersion, sandbox, indexTar )
 import System.IO ( withBinaryFile, IOMode(ReadMode) )
@@ -172,7 +172,7 @@ assertExitsFailure = assertProgram "exits with failure" $
 -- command line arg parser (and then, presumably, to cabal-install).
 -- Created due to issue 6: https://github.com/creswick/cabal-dev/issues#issue/6
 assertShortFlags :: HUnit.Assertion
-assertShortFlags = (parseGlobalFlags $ words "install -f-curl") @?= ([],["install", "-f-curl"],[])
+assertShortFlags = (parseGlobalFlags $ words "install -f-curl") @?= ([CabalInstallArg "-f-curl"],["install"],[])
 
 fst3 :: (a, b, c) -> a
 fst3 (x, _, _) = x

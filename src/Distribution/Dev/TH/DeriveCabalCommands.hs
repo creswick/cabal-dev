@@ -6,20 +6,20 @@ module Distribution.Dev.TH.DeriveCabalCommands
     )
 where
 
-import Control.Applicative ( (<$>) )
+import Control.Applicative ( (<$>), (<*>) )
 import Data.Char ( toUpper  )
 import Language.Haskell.TH
 import Distribution.Dev.InterrogateCabalInstall
     ( Option(..), OptionName(..), ArgType(..), CabalCommandStr, ccStr
-    , optParseFlags, getCabalCommandHelp, getCabalCommands )
+    , optParseFlags, getCabalCommandHelp, getCabalCommands, Program
+    , getCabalProgs
+    )
 
 mkLO :: Option -> Exp
 mkLO (Option on ty) =
     let (cn, o) = case on of
                     Short c -> ("Short", CharL c)
                     LongOption s -> ("LongOption", StringL s)
-                    ProgBefore s -> ("ProgBefore", StringL s)
-                    ProgAfter  s -> ("ProgAfter",  StringL s)
 
         tyE = ConE $ mkName $
               case ty of
@@ -35,22 +35,24 @@ mkLO (Option on ty) =
 
     in optC nE tyE
 
-mkSupportedOptionClause :: CabalCommandStr -> String -> Clause
-mkSupportedOptionClause cStr helpOutput =
-    let supportedFlags = ListE . map mkLO .
-                         optParseFlags $ helpOutput
+mkSupportedOptionClause :: [Program] -> CabalCommandStr -> String -> Clause
+mkSupportedOptionClause progs cStr helpOutput =
+    let supportedFlags = ListE . map mkLO $
+                         optParseFlags progs helpOutput
     in Clause [ConP (commandConsName cStr) []] (NormalB supportedFlags) []
 
-mkGetSupportedOptions :: [(CabalCommandStr, String)] -> [Dec]
-mkGetSupportedOptions cs =
+mkGetSupportedOptions :: [Program] -> [(CabalCommandStr, String)] -> [Dec]
+mkGetSupportedOptions progs cs =
     let n = mkName "commandOptions"
     in [ SigD n $ ccT ~~> AppT ListT (ConT (mkName "Option"))
-       , FunD n $ map (uncurry mkSupportedOptionClause) cs
+       , FunD n $ map (uncurry (mkSupportedOptionClause progs)) cs
        ]
 
 mkGetSupportedOptionsIO :: [CabalCommandStr] -> IO [Dec]
 mkGetSupportedOptionsIO ccs =
-    mkGetSupportedOptions . zip ccs <$> mapM getCabalCommandHelp ccs
+    do print =<< getCabalProgs
+       (mkGetSupportedOptions <$> getCabalProgs)
+         <*> (zip ccs <$> mapM getCabalCommandHelp ccs)
 
 mkCabalCommandsDef :: [CabalCommandStr] -> IO [Dec]
 mkCabalCommandsDef strs =
@@ -95,7 +97,7 @@ mkStrToCmd =
       nothing = Clause [WildP] (NormalB (ConE (mkName "Nothing"))) []
 
 cabalCommandsDef :: [CabalCommandStr] -> Dec
-cabalCommandsDef strs = DataD [] ccN [] (map cStrToCon strs) [mkName "Eq"]
+cabalCommandsDef strs = DataD [] ccN [] (map cStrToCon strs) [mkName "Eq", mkName "Show"]
 
 ccN :: Name
 ccN = mkName "CabalCommand"
