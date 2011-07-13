@@ -54,17 +54,15 @@ actions cc = CommandActions
 invokeCabal :: Config -> CI.CabalCommand -> [String] -> IO CommandResult
 invokeCabal flgs cc args = do
   let v = getVerbosity flgs
-  s <- initPkgDb v =<< resolveSandbox flgs
   cabal <- CI.findOnPath v $ cfgCabalInstall flgs
-  res <- setup s cabal flgs cc
+  res <- cabalArgs cabal flgs cc
   case res of
     Left err -> return $ CommandError err
     Right args' -> do
              runProgram v cabal $ args' ++ args
              return CommandOk
 
-cabalArgs :: ConfiguredProgram -> Config -> CI.CabalCommand
-          -> IO (Either String [String])
+cabalArgs :: ConfiguredProgram -> Config -> CI.CabalCommand -> IO (Either String [String])
 cabalArgs cabal flgs cc = do
   let v = getVerbosity flgs
   s <- initPkgDb v =<< resolveSandbox flgs
