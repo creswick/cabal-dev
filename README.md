@@ -68,6 +68,17 @@ reflect what cabal-dev does when it causes compilation).
 
 ## Building with private dependencies
 
+Cabal-dev supports two different workflows for using un-released
+packages. The first makes the dependencies available in a
+sandbox-local Hackage. The second rebuilds the dependent package every
+time. If any of your provate dependencies are unchanging (e.g. you had
+to patch a dependency to relax a package constraint) you will probably
+want to use add-source. If you are actively developing two packages
+that have dependencies on each other, you probably will prefer the
+second. You can mix and match these techniques seamlessly.
+
+### Using a sandbox-local Hackage
+
 Cabal-dev also allows you to use un-released packages as though they
 were on hackage with `cabal-dev add-source`.
 
@@ -98,3 +109,27 @@ dependencies into the sandbox, so the project will not build if
 critical files are left out of the sdist.  Note that the packages do
 not need to sdist cleanly, most warnings are acceptable, so this is
 rarely a problem.
+
+### Building multiple packages together
+
+For packages that are being actively developed together, recent
+cabal-install (> 0.10) provides another option: specify all of the
+source directories together on the cabal-install command line. For
+example, say we're developing a Web application that depends on a
+helper package that we use for other Web projects as well. We keep
+making changes to both the application and its helper package. To
+build both packages together:
+
+ $ ls
+ my-webapp/  webapp-helpers/
+ $ cabal-dev install my-webapp/ webapp-helpers/
+
+Note that this is a feature of newer cabal-install and is not limited
+to use with cabal-dev, but cabal-dev makes it more useful by keeping
+the development code isolated from other builds.
+
+The disadvantage of this approach is that it can be slow. When you
+have not made changes to a dependency, cabal-install will re-link and
+reinstall it anyway (although it does avoid recompilation when it's
+not necessary). Use the add-source mechanism if you have a dependency
+that changes very infrequently.
