@@ -34,6 +34,9 @@ commands that place the project's build artifacts in the cabal-dev
 sandbox, as well as leaving the binaries in the familiar `dist`
 directory.
 
+If you are developing multiple interdependent packages together, see
+the section below about building with private dependencies.
+
 ### Ghci with cabal-dev
 
 Cabal-dev 0.7.3.1 and greater are capable of launching ghci with the
