@@ -37,6 +37,8 @@ directory.
 If you are developing multiple interdependent packages together, see
 the section below about building with private dependencies.
 
+See cabal-dev --help for detailed usage information.
+
 ### Ghci with cabal-dev
 
 Cabal-dev 0.7.3.1 and greater are capable of launching ghci with the
