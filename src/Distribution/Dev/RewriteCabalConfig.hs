@@ -63,8 +63,7 @@ setPackageDb pkgDb = (F 0 "package-db" pkgDb:) . filter (not . isPackageDb)
       isPackageDb (F _ "package-db" _) = True
       isPackageDb _                  = False
 
-rewriteTopLevel :: (Traversable t, Applicative f) =>
-                   Expand f -> t Field -> f (t Field)
+rewriteTopLevel :: Applicative f => Expand f -> [Field] -> f [Field]
 rewriteTopLevel = traverse . rewriteField
 
 rewriteField :: Applicative m => Expand m -> Field -> m Field
