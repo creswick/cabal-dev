@@ -51,18 +51,18 @@ import Distribution.ParseUtils
 import Data.Function ( on )
 
 
-tests :: FilePath -> [Test]
-tests p =
+tests :: Verbosity -> FilePath -> [Test]
+tests v p =
     [ testGroup "Basic invocation tests" $ testBasicInvocation p
     , testGroup "Sandboxed" $
       [ testCase "add-source stays sandboxed (no-space dir)" $
-        addSourceStaysSandboxed normal p "fake-package."
+        addSourceStaysSandboxed v p "fake-package."
       , testCase "add-source stays sandboxed (dir with spaces)" $
-        addSourceStaysSandboxed normal p "fake package."
+        addSourceStaysSandboxed v p "fake package."
       , testCase "Builds ok regardless of the state of the logs directory" $
-        assertLogLocationOk normal p
+        assertLogLocationOk v p
       , testCase "Index tar files contain all contents" $
-        assertTarFileOk normal p
+        assertTarFileOk v p
       ]
     , testGroup "Parsing and serializing" $
       [ testCase "simple round-trip test" $
@@ -102,7 +102,7 @@ main = do
             (x:xs) -> (x, xs)
             []     -> ("cabal-dev", [])
 
-  defaultMainWithArgs (tests cabalDev) testFrameworkArgs
+  defaultMainWithArgs (tests normal cabalDev) testFrameworkArgs
 
 -- |Test that parsing and serializing a cabal-install SavedConfig with
 -- spaces in the paths preserves the spaces properly.
@@ -279,6 +279,7 @@ assertLogLocationOk v cabalDev =
             let lsMsg msg =
                     when (v >= verbose) $ do
                       putStrLn msg
+                      print ("ls", ["-ld", logsPth])
                       _ <- rawSystem "ls" ["-ld", logsPth]
                       return ()
             let withCabalDev f aa = do

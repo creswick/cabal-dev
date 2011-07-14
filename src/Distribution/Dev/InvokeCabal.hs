@@ -101,7 +101,7 @@ setup s cabal flgs cc = do
       let rew = R.Rewrite cabalHome (sandbox s) (pkgConf s) (CI.needsQuotes features)
           cOut = show $ R.ppTopLevel $ concat $
                  R.rewriteCabalConfig rew $
-                 foldr mergeFields userFields (devFields:extraConfigs)
+                 foldr (flip mergeFields) userFields (devFields:extraConfigs)
 
       writeUTF8File cfgOut cOut
       (gOpts, cOpts) <- extraArgs v cfgOut (getVersion s)
