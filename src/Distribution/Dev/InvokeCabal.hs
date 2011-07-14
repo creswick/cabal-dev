@@ -72,29 +72,16 @@ cabalArgs cabal flgs cc = do
   s <- initPkgDb v =<< resolveSandbox flgs
   setup s cabal flgs cc
 
-readConfig :: String -> Either String [Field]
-readConfig s = case readFields s of
-                 ParseOk _ fs  -> Right fs
-                 ParseFailed e -> Left $ show e
-
--- XXX: we should avoid this lazy IO that leaks a file handle.
-readConfigF :: FilePath -> IO (Either String [Field])
-readConfigF fn =
-    (readConfig <$> readUTF8File fn) `catch` \e -> return $ Left $ show e
-
 getUserConfigFields :: CI.CabalFeatures -> IO [Field]
 getUserConfigFields fs =
     -- If we fail to read the file, then it could be that it doesn't yet
     -- exist, and it's OK to ignore.
-    either (const []) id <$> (readConfigF =<< CI.getUserConfig fs)
-
-readConfigF_ :: FilePath -> IO [Field]
-readConfigF_ fn = either error id <$> readConfigF fn
+    either (const []) id <$> (R.readConfigF =<< CI.getUserConfig fs)
 
 -- XXX: this should return an error string instead of calling "error"
 -- on failure.
 getDevConfigFields :: Config -> IO [Field]
-getDevConfigFields cfg = readConfigF_ =<< getCabalConfig cfg
+getDevConfigFields cfg = R.readConfigF_ =<< getCabalConfig cfg
 
 setup :: Sandbox KnownVersion -> ConfiguredProgram -> Config ->
          CI.CabalCommand -> IO (Either String [String])
@@ -102,7 +89,7 @@ setup s cabal flgs cc = do
   let v = getVerbosity flgs
   cVer <- CI.getFeatures v cabal
   devFields <- getDevConfigFields flgs
-  extraConfigs <- mapM readConfigF_ $ extraConfigFiles flgs
+  extraConfigs <- mapM R.readConfigF_ $ extraConfigFiles flgs
   let cfgOut = cabalConf s
   case cVer of
     Left err -> return $ Left err

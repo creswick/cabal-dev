@@ -194,14 +194,14 @@ getCabalArgs vb sandbox cfgFile v = (cfgFileArg:) `fmap` extraArgs
 -- Rewrite the cabal-install config file to have absolute paths
 createCabalConfig :: FilePath -> FilePath -> IO FilePath
 createCabalConfig sandbox ghcPkgDb = do
-  let cfgIn = "admin" </> "cabal-config.in"
+  let cfgIn = "admin" </> "cabal-config-boot.in"
   let cfgOut = sandbox </> "cabal.config"
   cabalHome <- getAppUserDataDirectory "cabal"
-  either fail (writeFile cfgOut)
+  writeFile cfgOut . show . R.ppTopLevel
        -- XXX False should be determined based on the version of Cabal
        -- that the currently accessible cabal-install was built with:
       =<< R.rewriteCabalConfig (R.Rewrite cabalHome sandbox ghcPkgDb False)
-      =<< readFile cfgIn
+      =<< R.readConfigF_ cfgIn
   return cfgOut
 
 --------------------------------------------------

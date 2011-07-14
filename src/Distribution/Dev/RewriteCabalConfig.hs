@@ -13,13 +13,16 @@ module Distribution.Dev.RewriteCabalConfig
     ( rewriteCabalConfig
     , Rewrite(..)
     , ppTopLevel
+    , readConfigF
+    , readConfigF_
     )
 where
 
 import Control.Applicative       ( Applicative, pure, (<$>) )
 import Data.Maybe                ( fromMaybe )
 import Data.Traversable          ( traverse, Traversable )
-import Distribution.ParseUtils   ( Field(..) )
+import Distribution.ParseUtils   ( Field(..), readFields, ParseResult(..) )
+import Distribution.Simple.Utils ( readUTF8File )
 import Text.PrettyPrint.HughesPJ
 
 data Rewrite = Rewrite { homeDir          :: FilePath
@@ -27,6 +30,19 @@ data Rewrite = Rewrite { homeDir          :: FilePath
                        , packageDb        :: FilePath
                        , quoteInstallDirs :: Bool
                        }
+
+readConfig :: String -> Either String [Field]
+readConfig s = case readFields s of
+                 ParseOk _ fs  -> Right fs
+                 ParseFailed e -> Left $ show e
+
+-- XXX: we should avoid this lazy IO that leaks a file handle.
+readConfigF :: FilePath -> IO (Either String [Field])
+readConfigF fn =
+    (readConfig <$> readUTF8File fn) `catch` \e -> return $ Left $ show e
+
+readConfigF_ :: FilePath -> IO [Field]
+readConfigF_ fn = either error id <$> readConfigF fn
 
 -- |Rewrite a cabal-install config file so that all paths are made
 -- absolute and canonical.
