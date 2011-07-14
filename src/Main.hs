@@ -23,6 +23,7 @@ import qualified Distribution.Dev.AddSource as AddSource
 import qualified Distribution.Dev.Ghci as Ghci
 import qualified Distribution.Dev.InvokeCabal as InvokeCabal
 import qualified Distribution.Dev.InstallDependencies as InstallDeps
+import qualified Distribution.Dev.BuildOpts as BuildOpts
 import qualified Distribution.Dev.CabalInstall as CI
 import Paths_cabal_dev ( version )
 
@@ -49,6 +50,11 @@ cabalDevCommands = [ ( "add-source"
                        "yet take into account the contents of the .cabal " ++
                        "file (e.g. source directories, available packages " ++
                        "LANGUAGE pragmas)."
+                     )
+                   , ( "buildopts"
+                     , BuildOpts.actions
+                     , "Extract the options that would be passed to the " ++
+                       "compiler when building"
                      )
                    ]
 
