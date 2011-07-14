@@ -18,12 +18,14 @@ module Distribution.Dev.CabalInstall
        , commandOptions
        , supportsLongOption
        , supportedOptions
+       , getUserConfig
        )
 where
 
 import Data.Maybe ( fromMaybe )
-import Data.List ( tails, isPrefixOf )
-import Control.Applicative ( (<$>) )
+import Control.Applicative ( (<$>), pure )
+import System.FilePath ( (</>) )
+import System.Environment ( getEnvironment )
 import Distribution.Version ( Version(..), withinRange
                             , earlierVersion, orLaterVersion )
 import Distribution.Verbosity ( Verbosity )
@@ -138,3 +140,11 @@ commonOptions = [Option (LongOption "config-file") Req]
 -- cabal-dev repo)
 configDir :: CabalFeatures -> IO FilePath
 configDir _ = getAppUserDataDirectory "cabal"
+
+getUserConfig :: CabalFeatures -> IO FilePath
+getUserConfig cf = do
+  env <- lookup "CABAL_CONFIG" <$> getEnvironment
+  case env of
+    Nothing -> (</> "config") <$> configDir cf
+    Just f  -> pure f
+

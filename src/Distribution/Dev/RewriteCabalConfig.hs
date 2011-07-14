@@ -12,12 +12,14 @@ This module is written so that it will work out-of-the-box with GHC >=
 module Distribution.Dev.RewriteCabalConfig
     ( rewriteCabalConfig
     , Rewrite(..)
+    , ppTopLevel
     )
 where
 
+import Control.Applicative       ( Applicative, pure, (<$>) )
 import Data.Maybe                ( fromMaybe )
-import Control.Monad             ( liftM )
-import Distribution.ParseUtils   ( readFields, ParseResult(..), Field(..) )
+import Data.Traversable          ( traverse, Traversable )
+import Distribution.ParseUtils   ( Field(..) )
 import Text.PrettyPrint.HughesPJ
 
 data Rewrite = Rewrite { homeDir          :: FilePath
@@ -28,20 +30,16 @@ data Rewrite = Rewrite { homeDir          :: FilePath
 
 -- |Rewrite a cabal-install config file so that all paths are made
 -- absolute and canonical.
-rewriteCabalConfig :: Rewrite -> String -> IO (Either String String)
+rewriteCabalConfig :: Applicative f => Rewrite -> [Field] -> f [Field]
 rewriteCabalConfig r = rewriteConfig expand (setPackageDb $ packageDb r)
   where
     expand = expandCabalConfig (quoteInstallDirs r) (homeDir r) (sandboxDir r)
 
 -- |Given an expansion configuration, read the input config file and
 -- write the expansion into the output config file
-rewriteConfig :: Expand IO -> ([Field] -> [Field]) -> String
-              -> IO (Either String String)
-rewriteConfig expand proc s =
-        case readFields s of
-          ParseFailed err -> return $ Left $ show err
-          ParseOk _ fs    ->
-              (Right . show . ppTopLevel . proc) `fmap` rewriteTopLevel expand fs
+rewriteConfig :: Applicative f =>
+                 Expand f -> ([Field] -> [Field]) -> [Field] -> f [Field]
+rewriteConfig expand proc fs = proc <$> rewriteTopLevel expand fs
 
 setPackageDb :: FilePath -> [Field] -> [Field]
 setPackageDb pkgDb = (F 0 "package-db" pkgDb:) . filter (not . isPackageDb)
@@ -49,21 +47,22 @@ setPackageDb pkgDb = (F 0 "package-db" pkgDb:) . filter (not . isPackageDb)
       isPackageDb (F _ "package-db" _) = True
       isPackageDb _                  = False
 
-rewriteTopLevel :: Monad m => Expand m -> [Field] -> m [Field]
-rewriteTopLevel = mapM . rewriteField
+rewriteTopLevel :: (Traversable t, Applicative f) =>
+                   Expand f -> t Field -> f (t Field)
+rewriteTopLevel = traverse . rewriteField
 
-rewriteField :: Monad m => Expand m -> Field -> m Field
+rewriteField :: Applicative m => Expand m -> Field -> m Field
 rewriteField expand field =
     case field of
-      F l name val -> F l name `liftM` rewriteLeaf name val
-      Section l name key fs -> Section l name key `liftM`
+      F l name val -> F l name <$> rewriteLeaf name val
+      Section l name key fs -> Section l name key <$>
                                rewriteSection name fs
       _ -> error $ "Only top-level fields and sections \ 
                    \supported. Not: " ++ show field
     where
       rewriteLeaf name val
           | name `elem` eLeaves expand = eExpand expand val
-          | otherwise                  = return val
+          | otherwise                  = pure val
 
       rewriteSection s = rewriteTopLevel $
                          fromMaybe don'tExpand $
@@ -84,9 +83,9 @@ ppTopLevel = vcat . map ppField
 --------------------------------------------------
 -- Expanding fields
 
-data Expand m = Expand { eExpand :: String -> m String
+data Expand f = Expand { eExpand :: String -> f String
                        , eLeaves :: [String]
-                       , eSections :: [(String, Expand m)]
+                       , eSections :: [(String, Expand f)]
                        }
 
 -- |Replace a tilde as an initial path segment with a path.
@@ -102,8 +101,8 @@ expandDot sandbox s = case break (== '/') s of
                         _           -> s
 
 -- |Identity expansion
-don'tExpand :: Monad m => Expand m
-don'tExpand = Expand return [] []
+don'tExpand :: Applicative f => Expand f
+don'tExpand = Expand pure [] []
 
 -- This is the part that's specific to the cabal-install config file:
 -- These are the parts of the config file that are paths into the
@@ -114,12 +113,13 @@ don'tExpand = Expand return [] []
 --
 -- If the cabal-install config file changes, or if this list is not
 -- complete, this code will have to be updated.
-expandCabalConfig :: Bool -- ^Whether the install-dirs section of the
+expandCabalConfig :: Applicative f =>
+                     Bool -- ^Whether the install-dirs section of the
                           -- cabal config file will quote paths.
                           -- Versions of cabal-install prior to 0.9
                           -- required quoting. Versions 0.9 and later
                           -- forbit it.
-                     -> FilePath -> FilePath -> Expand IO
+                     -> FilePath -> FilePath -> Expand f
 expandCabalConfig shouldQuote home sandbox =
     Expand { eExpand = ePath
            , eLeaves = [ "remote-repo-cache"
@@ -160,4 +160,4 @@ expandCabalConfig shouldQuote home sandbox =
       quote | shouldQuote = fmap show
             | otherwise   = id
 
-      ePath = return . expandDot sandbox . expandTilde home
+      ePath = pure . expandDot sandbox . expandTilde home
