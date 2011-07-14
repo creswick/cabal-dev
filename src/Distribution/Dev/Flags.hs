@@ -11,6 +11,8 @@ module Distribution.Dev.Flags
     , fromFlags
     , passthroughArgs
     , cfgCabalInstall
+    , extraConfigFiles
+    , useUserConfig
 
     , globalOpts
     , parseGlobalFlags
@@ -41,6 +43,8 @@ data GlobalFlag = Help
                 | Version Bool
                 | CabalInstallArg String
                 | WithCabalInstall FilePath
+                | ExtraConfig FilePath
+                | NoUserConfig
                   deriving (Eq, Show)
 
 globalOpts :: [OptDescr GlobalFlag]
@@ -62,6 +66,14 @@ globalOpts = [ Option "h?" ["help"] (NoArg Help) "Show help text"
              , Option "" ["with-cabal-install"] (ReqArg WithCabalInstall "PATH") $
                "The location of the specific cabal-install to invoke " ++
                "(defaults to looking on your PATH)"
+             , Option "" ["extra-config-file"] (ReqArg ExtraConfig "PATH") $
+               "Additional cabal-install configuration files to merge " ++
+               "with the user configuration file and the cabal-dev " ++
+               "configuration file. These settings override any that " ++
+               "exist in a previously-loaded configuration file."
+             , Option "" ["no-user-config"] (NoArg NoUserConfig) $
+               "Do not use any settings from the default cabal-install " ++
+               "config file."
              ]
 
 cabalArgToOptDescr :: CI.Option -> OptDescr GlobalFlag
@@ -123,8 +135,17 @@ parseGlobalFlags :: [String] -> ([GlobalFlag], [String], [String])
 parseGlobalFlags args = getOpt'' (globalOpts ++ defs) args
     where
       cmd = CI.stringToCommand =<< listToMaybe (dropWhile isOpt args)
-      defs = map cabalArgToOptDescr $ CI.commandOptions =<< maybeToList cmd
+      defs = dropDuplicateDefs globalOpts $
+             map cabalArgToOptDescr $ CI.commandOptions =<< maybeToList cmd
       isOpt = (== "-") . take 1
+      dropDuplicateDefs defs1 = map (\d -> dropDuplicate d defs1)
+      dropDuplicate = foldr dropDuplicate1
+      dropDuplicate1 (Option ss1 ls1 _ _) (Option ss2 ls2 o d) = Option ss' ls' o d
+          where
+            diffList l1 l2 = filter (not . (`elem` l2)) l1
+            ss' = diffList ss2 ss1
+            ls' = diffList ls2 ls1
+
 
 helpRequested :: [GlobalFlag] -> Bool
 helpRequested = (Help `elem`)
@@ -151,18 +172,21 @@ data Config = Config { cfgVerbosity   :: Maybe Verbosity
                      , cfgSandbox     :: Maybe FilePath
                      , cfgCabalInstall :: Maybe FilePath
                      , passthroughArgs :: [String]
+                     , extraConfigFiles :: [String]
+                     , useUserConfig :: Bool
                      }
 
 instance Monoid Config where
-    mempty = Config Nothing Nothing Nothing Nothing []
-    mappend (Config v1 c1 s1 ci1 a1) (Config v2 c2 s2 ci2 a2) =
-        Config (v2 `mplus` v1) (c2 `mplus` c1) (s2 `mplus` s1) (ci1 `mplus` ci2) (a1 ++ a2)
+    mempty = Config Nothing Nothing Nothing Nothing [] [] True
+    mappend (Config v1 c1 s1 ci1 a1 e1 u1) (Config v2 c2 s2 ci2 a2 e2 u2) =
+        Config (v2 `mplus` v1) (c2 `mplus` c1) (s2 `mplus` s1) (ci1 `mplus` ci2) (a1 ++ a2) (e1 ++ e2) (u1 && u2)
 
 fromFlag :: GlobalFlag -> Config
-fromFlag (CabalConf p) = mempty { cfgCabalConfig = Just p }
-fromFlag (Sandbox s)   = mempty { cfgSandbox = Just s }
+fromFlag (CabalConf p)        = mempty { cfgCabalConfig = Just p }
+fromFlag (Sandbox s)          = mempty { cfgSandbox = Just s }
 fromFlag (WithCabalInstall p) = mempty { cfgCabalInstall = Just p }
-fromFlag (Verbose s)   = mempty { cfgVerbosity = v }
+fromFlag (ExtraConfig f)      = mempty { extraConfigFiles = [f] }
+fromFlag (Verbose s)          = mempty { cfgVerbosity = v }
     where
       v = case runReadE flagToVerbosity `fmap` s of
             Nothing        -> Just verbose

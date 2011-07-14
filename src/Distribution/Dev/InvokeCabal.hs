@@ -29,7 +29,8 @@ import Distribution.Dev.Command            ( CommandActions(..)
                                            )
 import Distribution.Dev.Flags              ( Config, getCabalConfig
                                            , getVerbosity, passthroughArgs
-                                           , cfgCabalInstall
+                                           , cfgCabalInstall, extraConfigFiles
+                                           , useUserConfig
                                            )
 import Distribution.Dev.InitPkgDb          ( initPkgDb )
 import qualified Distribution.Dev.RewriteCabalConfig as R
@@ -87,26 +88,33 @@ getUserConfigFields fs =
     -- exist, and it's OK to ignore.
     either (const []) id <$> (readConfigF =<< CI.getUserConfig fs)
 
+readConfigF_ :: FilePath -> IO [Field]
+readConfigF_ fn = either error id <$> readConfigF fn
+
+-- XXX: this should return an error string instead of calling "error"
+-- on failure.
 getDevConfigFields :: Config -> IO [Field]
-getDevConfigFields cfg =
-    either error id <$> (readConfigF =<< getCabalConfig cfg)
+getDevConfigFields cfg = readConfigF_ =<< getCabalConfig cfg
 
 setup :: Sandbox KnownVersion -> ConfiguredProgram -> Config ->
          CI.CabalCommand -> IO (Either String [String])
 setup s cabal flgs cc = do
   let v = getVerbosity flgs
-  devFields <- getDevConfigFields flgs
   cVer <- CI.getFeatures v cabal
+  devFields <- getDevConfigFields flgs
+  extraConfigs <- mapM readConfigF_ $ extraConfigFiles flgs
   let cfgOut = cabalConf s
   case cVer of
     Left err -> return $ Left err
     Right features -> do
-      userFields <- getUserConfigFields features
+      userFields <- if useUserConfig flgs
+                    then getUserConfigFields features
+                    else return []
       cabalHome <- CI.configDir features
       let rew = R.Rewrite cabalHome (sandbox s) (pkgConf s) (CI.needsQuotes features)
           cOut = show $ R.ppTopLevel $ concat $
                  R.rewriteCabalConfig rew $
-                 mergeFields userFields devFields
+                 foldr mergeFields userFields (devFields:extraConfigs)
 
       writeUTF8File cfgOut cOut
       (gOpts, cOpts) <- extraArgs v cfgOut (getVersion s)

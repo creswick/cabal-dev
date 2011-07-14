@@ -22,7 +22,7 @@ module Distribution.Dev.InterrogateCabalInstall
 where
 
 import Control.Applicative ( (<$>) )
-import Data.Char ( isSpace, isAsciiUpper, isAsciiLower, ord )
+import Data.Char ( isSpace, isAsciiUpper, isAsciiLower, ord, isLetter )
 import Data.List ( isPrefixOf, sort )
 import Control.Monad ( guard )
 import Data.Maybe ( mapMaybe )
@@ -110,8 +110,8 @@ optParseFlags progs = extractLongOptions . findOptionLines . lines
         (optName, rest) <- plainOpt xs ++ progBefore xs ++ progAfter xs
         let (eoc, ty) =
                 case take 2 rest of
-                  ['=',_] -> (dropWhile isAsciiUpper $ drop 1 rest, Req)
-                  "[="    -> (drop 1 $ dropWhile isAsciiUpper $ drop 2 rest, Opt)
+                  ['=',_] -> (dropWhile isLetter $ drop 1 rest, Req)
+                  "[="    -> (drop 1 $ dropWhile isLetter $ drop 2 rest, Opt)
                   _       -> (rest, NoArg)
             opt = (optName, ty)
         case eoc of
