@@ -7,12 +7,13 @@ import Data.Char ( isSpace, isLetter )
 import Data.List ( intercalate, transpose )
 import Data.Maybe ( listToMaybe )
 import Data.Version ( showVersion )
-import Control.Monad ( unless, mplus )
+import Control.Monad ( unless )
 import System.Exit ( exitWith, ExitCode(..) )
 import System.Environment ( getArgs, getProgName )
 import System.Console.GetOpt ( usageInfo, getOpt, ArgOrder(Permute) )
 import Distribution.Simple.Utils ( cabalVersion, debug )
 import Distribution.Text ( display )
+import Control.Monad.Trans.State ( evalState, gets, modify )
 
 import Distribution.Dev.Command ( CommandActions(..), CommandResult(..) )
 import Distribution.Dev.Flags ( parseGlobalFlags, helpRequested, globalOpts
@@ -28,7 +29,6 @@ import qualified Distribution.Dev.CabalInstall as CI
 import Paths_cabal_dev ( version )
 
 import qualified Data.Map as Map
-import Data.Map ( Map )
 
 cabalDevCommands :: [(String, CommandActions, String)]
 cabalDevCommands = [ ( "add-source"
@@ -180,44 +180,30 @@ fmtTable colSep rows = map fmtLine $ fmtRow =<< rows
 --
 -- This function has heuristics for human-readability, such as
 -- avoiding splitting in the middle of words when possible.
-wrap :: Int -> String -> [String]
-wrap w s = snd $ fst $ wrap' w Map.empty 0 s
-
--- |Ensure that the memo table has an entry for the specified location
--- in the string.
-wrap' :: Int                     -- ^ Line length
-      -> Map Int (Int, [String]) -- ^ Memo table
-      -> Int                     -- ^ Position in String
-      -> String                  -- ^ String remaining
-      -> ((Int, [String]), Map Int (Int, [String])) -- ^ Updated memo table
-wrap' w best i s =
-    -- Check to see if this location is already in the memo table
-    case Map.lookup i best of
-      Nothing  -> go Nothing best $ splits w s
-      Just ans -> (ans, best)
-
+wrap :: Int      -- ^Maximum line length
+     -> String   -- ^Text to wrap
+     -> [String] -- ^Wrapped lines
+wrap _ ""   = []
+wrap w orig = snd $ evalState (go 0 orig) Map.empty
     where
-      go Nothing _ []              = error "Wrapping failed"
+      go loc s = do
+        precomputed <- gets $ Map.lookup loc
+        case precomputed of
+          Nothing     -> bestAnswer loc =<< mapM (scoreSplit loc) (splits w s)
+          Just answer -> return answer
 
-      -- We have tried all of the options for splitting at this point.
-      -- Now we have the best result, and we can and add it to the
-      -- memo table.
-      go (Just (sc, ans)) b []     = ((sc, ans), Map.insert i (sc, ans) b)
+      scoreSplit loc (offset, lineScore, line, s') =
+          case s' of
+            "" -> return (lineScore, [line])
+            _  -> do
+              (restScore, lines_) <- go (loc + offset) s'
+              return (lineScore + restScore, line:lines_)
 
-      -- Try a particular split
-      go a b ((k, sc, l, rest):s') =
-          let (b'', a') = case rest of
-                            [] -> (b, Just (sc, [l]))
-                            _  -> let i' = k + i
-                                      ((sc', ans), b') = wrap' w b i' rest
-                                  in (b', Just (sc + sc', l:ans))
-
-              a'' = case (a, a') of
-                      (Just (sc1, a1), Just (sc2, a2)) ->
-                          Just $ if sc1 <= sc2 then (sc1, a1) else (sc2, a2)
-                      _                                -> a `mplus` a'
-
-          in go a'' b'' s'
+      bestAnswer _ [] = error "No splits found!"
+      bestAnswer loc answers = do
+        let answer = minimum answers
+        modify $ Map.insert loc answer
+        return answer
 
 -- Find all the locations that make sense to split the next line, and
 -- score them.
@@ -227,9 +213,18 @@ splits w s = map (\k -> score k $ splitAt k s) [w - 1,w - 2..1]
       score k ([], cs)      = (k, w * w, [], cs)
       score k (r, [])       = (k, 0, r, [])
       score k (r, cs@(c:_)) = let (sps, cs') = countDropSpaces 0 cs
-                              in ( k + sps
-                                 , penalty (last r) c + w - length r
+                                  spaceLeft = w - length r
+                              in ( -- How much of the string was consumed?
+                                   k + sps
+
+                                 -- How much does it cost to split here?
+                                 , penalty (last r) c + spaceLeft * spaceLeft
+
+                                 -- The text of the line that results
+                                 -- from this split
                                  , r
+
+                                 -- The text that has not yet been split
                                  , cs'
                                  )
 
@@ -240,6 +235,8 @@ splits w s = map (\k -> score k $ splitAt k s) [w - 1,w - 2..1]
       -- their right
       rbind = (`elem` "\"'([<")
 
+      -- How much should it cost to make a split between these
+      -- characters?
       penalty b c
           -- Don't penalize boundaries between space and non-space
           | not (isSpace b) && isSpace c  = 0

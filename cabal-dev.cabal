@@ -86,6 +86,7 @@ Executable cabal-dev
       process >= 1.0 && < 1.1,
       tar >= 0.3 && < 0.4,
       zlib >= 0.5 && < 0.6,
+      transformers >= 0.2 && < 0.3,
 
       -- Template haskell is special: the compiler will die if a
       -- version other than the one that is shipped with the compiler
