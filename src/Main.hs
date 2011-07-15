@@ -25,6 +25,7 @@ import qualified Distribution.Dev.Ghci as Ghci
 import qualified Distribution.Dev.InvokeCabal as InvokeCabal
 import qualified Distribution.Dev.InstallDependencies as InstallDeps
 import qualified Distribution.Dev.BuildOpts as BuildOpts
+import qualified Distribution.Dev.GhcPkg as GhcPkg
 import qualified Distribution.Dev.CabalInstall as CI
 import Paths_cabal_dev ( version )
 
@@ -58,6 +59,12 @@ cabalDevCommands = [ ( "add-source"
                      , BuildOpts.actions
                      , "Extract the options that would be passed to the " ++
                        "compiler when building"
+                     )
+                   , ( "ghc-pkg"
+                     , GhcPkg.actions
+                     , "Invoke ghc-pkg including the appropriate " ++
+                       "--package-conf argument to run on the sandbox's " ++
+                       "package database."
                      )
                    ]
 
@@ -124,7 +131,8 @@ main = do
 globalUsage :: IO String
 globalUsage = do
   progName <- getProgName
-  let fmtCommands cmds = fmtTable "  " [ [[""], [n], wrap 60 d] | (n, _, d) <- cmds ]
+  let fmtCommands cmds =
+          fmtTable "  " [ [[""], [n], wrap 60 d] | (n, _, d) <- cmds ]
   let preamble =
           unlines $
           [ ""
