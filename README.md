@@ -125,9 +125,9 @@ helper package that we use for other Web projects as well. We keep
 making changes to both the application and its helper package. To
 build both packages together:
 
- $ ls
- my-webapp/  webapp-helpers/
- $ cabal-dev install my-webapp/ webapp-helpers/
+    $ ls
+    my-webapp/  webapp-helpers/
+    $ cabal-dev install my-webapp/ webapp-helpers/
 
 Note that this is a feature of newer cabal-install and is not limited
 to use with cabal-dev, but cabal-dev makes it more useful by keeping
