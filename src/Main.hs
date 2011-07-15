@@ -4,10 +4,10 @@ module Main
 where
 
 import Data.Char ( isSpace, isLetter )
-import Data.List ( intercalate, transpose, sort )
+import Data.List ( intercalate, transpose )
 import Data.Maybe ( listToMaybe )
 import Data.Version ( showVersion )
-import Control.Monad ( unless )
+import Control.Monad ( unless, mplus )
 import System.Exit ( exitWith, ExitCode(..) )
 import System.Environment ( getArgs, getProgName )
 import System.Console.GetOpt ( usageInfo, getOpt, ArgOrder(Permute) )
@@ -26,6 +26,9 @@ import qualified Distribution.Dev.InstallDependencies as InstallDeps
 import qualified Distribution.Dev.BuildOpts as BuildOpts
 import qualified Distribution.Dev.CabalInstall as CI
 import Paths_cabal_dev ( version )
+
+import qualified Data.Map as Map
+import Data.Map ( Map )
 
 cabalDevCommands :: [(String, CommandActions, String)]
 cabalDevCommands = [ ( "add-source"
@@ -173,35 +176,75 @@ fmtTable colSep rows = map fmtLine $ fmtRow =<< rows
       widths = map (maximum . map length . concat) $ transpose rows
       pad c w s = take w $ s ++ repeat c
 
--- XXX: this is very inefficient, to an extent that is noticable and
--- annoying sometimes. A directed search would be much better.
 -- |Wrap a String of text to lines shorter than the specified number.
 --
 -- This function has heuristics for human-readability, such as
 -- avoiding splitting in the middle of words when possible.
 wrap :: Int -> String -> [String]
-wrap w = snd . go 0
+wrap w s = snd $ fst $ wrap' w Map.empty 0 s
+
+-- |Ensure that the memo table has an entry for the specified location
+-- in the string.
+wrap' :: Int                     -- ^ Line length
+      -> Map Int (Int, [String]) -- ^ Memo table
+      -> Int                     -- ^ Position in String
+      -> String                  -- ^ String remaining
+      -> ((Int, [String]), Map Int (Int, [String])) -- ^ Updated memo table
+wrap' w best i s =
+    -- Check to see if this location is already in the memo table
+    case Map.lookup i best of
+      Nothing  -> go Nothing best $ splits w s
+      Just ans -> (ans, best)
+
     where
-      go n s
-          | length s < w = (n, [s])
-          | otherwise = minimum $
-                        do -- consider the best 10 splits of a line
-                          (sc, r, s') <- take 5 $ sort $ splits s
-                          let (sc', t) = go (n + sc) s'
-                          return (sc', r:t)
+      go Nothing _ []              = error "Wrapping failed"
 
-      splits s = map (\k -> score $ splitAt k s) [w - 1,w - 2..1]
+      -- We have tried all of the options for splitting at this point.
+      -- Now we have the best result, and we can and add it to the
+      -- memo table.
+      go (Just (sc, ans)) b []     = ((sc, ans), Map.insert i (sc, ans) b)
 
-      score ([], cs)      = (w * w, [], cs)
-      score (r, [])       = (0, r, [])
-      score (r, cs@(c:_)) = ( penalty (last r) c + w - length r
-                            , r
-                            , dropWhile isSpace cs
-                            )
+      -- Try a particular split
+      go a b ((k, sc, l, rest):s') =
+          let (b'', a') = case rest of
+                            [] -> (b, Just (sc, [l]))
+                            _  -> let i' = k + i
+                                      ((sc', ans), b') = wrap' w b i' rest
+                                  in (b', Just (sc + sc', l:ans))
+
+              a'' = case (a, a') of
+                      (Just (sc1, a1), Just (sc2, a2)) ->
+                          Just $ if sc1 <= sc2 then (sc1, a1) else (sc2, a2)
+                      _                                -> a `mplus` a'
+
+          in go a'' b'' s'
+
+-- Find all the locations that make sense to split the next line, and
+-- score them.
+splits :: Int -> String -> [(Int, Int, String, String)]
+splits w s = map (\k -> score k $ splitAt k s) [w - 1,w - 2..1]
+    where
+      score k ([], cs)      = (k, w * w, [], cs)
+      score k (r, [])       = (k, 0, r, [])
+      score k (r, cs@(c:_)) = let (sps, cs') = countDropSpaces 0 cs
+                              in ( k + sps
+                                 , penalty (last r) c + w - length r
+                                 , r
+                                 , cs'
+                                 )
+
+      countDropSpaces i (c:cs) | isSpace c = countDropSpaces (i + 1) cs
+      countDropSpaces i cs                 = (i, cs)
+
+      -- Characters that want to stick to non-whitespace characters to
+      -- their right
+      rbind = (`elem` "\"'([<")
+
       penalty b c
           -- Don't penalize boundaries between space and non-space
           | not (isSpace b) && isSpace c  = 0
           | isSpace b && not (isSpace c)  = 2
+          | rbind b && not (isSpace c) = w `div` 2
           -- Penalize splitting a word heavily
           | isLetter b && isLetter c = w * 2
           -- Prefer splitting after a letter if it's not
@@ -209,4 +252,4 @@ wrap w = snd . go 0
           | isLetter c = 3
           -- Other kinds of splits are not as bad as splitting
           -- between words, but are still pretty harmful.
-          | otherwise  = w `div` 2
+          | otherwise  = w
