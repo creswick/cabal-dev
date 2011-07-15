@@ -24,8 +24,6 @@ Description:         cabal-dev is a tool for managing development builds of
                      .
                      @cabal-dev add-source@ also supports importing tarballs
                      into a local cabal repository.
-                     .
-                     This tool has been tested with GHC 6.8-7.0.3.
 
 License:             BSD3
 License-file:        LICENSE
@@ -39,7 +37,7 @@ Cabal-version:       >=1.6
 Data-Files:
   admin/cabal-config.in,
   admin/00-index.tar
-Tested-with: ghc == 6.12.3, ghc == 6.10.4, ghc == 7.0.3
+Tested-with: GHC == 6.12.3, GHC == 6.10.4, GHC == 7.0.3
 
 source-repository head
   type:        git
