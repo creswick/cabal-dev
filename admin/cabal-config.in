@@ -39,7 +39,7 @@ local-repo: ./packages
 -- library-for-ghci: True
 -- split-objs: False
 -- executable-stripping: True
--- user-install: False
+user-install: False
 package-db: ./packages.conf
 -- flags:
 -- extra-include-dirs:
