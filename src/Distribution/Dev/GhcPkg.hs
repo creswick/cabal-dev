@@ -38,5 +38,5 @@ invokeGhcPkg cfg args = do
                     GHC_6_8_Db _ -> id
                     _            -> ("--no-user-package-conf":)
 
-  runProgram v ghcPkg $ extraArgs $ "--package-conf" : pkgConf s : args
+  runProgram v ghcPkg $ extraArgs $ "--global" : "--package-conf" : pkgConf s : args
   return CommandOk
