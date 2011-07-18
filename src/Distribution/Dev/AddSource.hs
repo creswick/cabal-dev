@@ -309,6 +309,7 @@ processDirectory v d = go `catch` \e ->
                              ]
 
       go = do
+        debug v =<< getCurrentDirectory
         fns <- getDirectoryContents d
         case filter isCabalFile fns of
           [c] -> processCabalFile c

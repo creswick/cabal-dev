@@ -40,7 +40,7 @@ installDependencies flgs pkgNames = do
                        \the --only-dependencies flag to the install command.\
                        \ Invoking that instead..."
               runProgram v cabal $ concat [ args
-                                          , ["install", "--only-dependencies"]
+                                          , ["--only-dependencies"]
                                           , pkgNames
                                           ]
               return CommandOk
@@ -49,7 +49,7 @@ installDependencies flgs pkgNames = do
                \ less than 0.10"
         out <- getProgramOutput v cabal $ concat
                [ args
-               , ["install", "--dry-run", "--verbose=1"]
+               , ["--dry-run", "--verbose=1"]
                , pkgNames
                ]
         let -- Drop the lines that say:
