@@ -30,7 +30,8 @@ License-file:        LICENSE
 Author:              Josh Hoyt, Jonathan Daugherty, Rogan Creswick
 Maintainer:          j3h@galois.com, jtd@galois.com, creswick@galois.com
 Homepage:            https://github.com/creswick/cabal-dev
-Copyright:           2010 Galois, Inc.
+Bug-Reports:         https://github.com/creswick/cabal-dev/issues
+Copyright:           2011 Galois, Inc.
 Category:            Development
 Build-type:          Custom
 Cabal-version:       >=1.6
