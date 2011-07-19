@@ -1,4 +1,4 @@
-{- Copyright (c) 2010 Galois, Inc. -}
+{- Copyright (c) 2011 Galois, Inc. -}
 {-# LANGUAGE CPP #-}
 module Distribution.Dev.Flags
     ( GlobalFlag(..)
