@@ -62,6 +62,7 @@ Executable cabal-dev
   HS-Source-Dirs: src
   Main-is: Main.hs
   GHC-Options: -Wall
+  Extensions: TemplateHaskell
 
   if flag(no-cabal-dev)
     Buildable: False
