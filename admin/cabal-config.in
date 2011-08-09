@@ -49,7 +49,7 @@ package-db: ./packages.conf
 -- preference:
 -- documentation: False
 -- doc-index-file: $datadir/doc/index.html
--- root-cmd:
+root-cmd: USE-DEFAULT
 -- symlink-bindir:
 build-summary: ./logs/build.log
 -- build-log:

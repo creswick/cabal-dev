@@ -5,10 +5,14 @@ Merge configuration files for Cabal (and cabal-install).
 -}
 module Distribution.Dev.MergeCabalConfig
     ( mergeFields
+    , isFlaggedForRemoval
+    , filterFields
+    , removeFlaggedFields
     )
 where
 
-import Data.Maybe              ( fromMaybe )
+import Data.Maybe              ( fromMaybe, mapMaybe )
+import Control.Monad           ( guard )
 import Control.Applicative     ( Applicative, Alternative, pure, empty, (<|>), (<$>) )
 import Distribution.ParseUtils ( Field(..) )
 
@@ -27,6 +31,40 @@ mergeFields :: [Field] -- ^Starting fields
                        -- second argument)
 mergeFields = foldr $ \f fs ->
               fromMaybe (f:fs) $ replace (mergeField mergeFields f) fs
+
+-- |Filter a configuration based on a predicate. Filters at the top
+-- level as well as inside of Sections.
+--
+-- >>> let p f = case f of { F _ _ "bar" -> False; _ -> True; }
+-- >>> filterFields p [F 0 "foo" "bar", Section 1 "quux" "beep" [], F 2 "arf" "baz"]
+-- [Section 1 "quux" "beep" [], Field 2 "arf" "baz"]
+filterFields :: (Field -> Bool) -> [Field] -> [Field]
+filterFields p = mapMaybe $ \f -> guard (p f) >> return (recurseSection f)
+    where
+      recurseSection :: Field -> Field
+      recurseSection (Section l n a fs) = Section l n a $ filterFields p fs
+      recurseSection f                  = f
+
+-- |Look for the magic value "USE-DEFAULT" as the value of a leaf
+-- (Field). This means that there is no way to set a field to the
+-- value "USE-DEFAULT" in a cabal configuration for use with
+-- cabal-dev.
+--
+-- >>> isFlaggedForRemoval (F 0 "root-cmd" "sudo")
+-- False
+-- >>> isFlaggedForRemoval (F 0 "root-cmd" "USE-DEFAULT")
+-- True
+isFlaggedForRemoval :: Field -> Bool
+isFlaggedForRemoval (F _ _ "USE-DEFAULT") = True
+isFlaggedForRemoval _                     = False
+
+-- |Recursively remove all fields whose value is "USE-DEFAULT" from
+-- the configuration.
+--
+-- >>> removeFlaggedFields [F 0 "foo" "USE-DEFAULT", Section 1 "quux" "beep" [], F 2 "arf" "baz"]
+-- [Section 1 "quux" "beep" [], F 2 "arf" "baz"]
+removeFlaggedFields :: [Field] -> [Field]
+removeFlaggedFields = filterFields $ not . isFlaggedForRemoval
 
 -- |Attempt to merge two fields.
 --

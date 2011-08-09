@@ -1,5 +1,5 @@
 Name:                cabal-dev
-Version:             0.8
+Version:             0.9
 Synopsis:            Manage sandboxed Haskell build environments
 
 Description:         cabal-dev is a tool for managing development builds of

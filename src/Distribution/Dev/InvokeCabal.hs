@@ -45,7 +45,7 @@ import Distribution.Dev.Sandbox            ( resolveSandbox
                                            , sandbox
                                            )
 import Distribution.Dev.Utilities          ( ensureAbsolute )
-import Distribution.Dev.MergeCabalConfig   ( mergeFields )
+import Distribution.Dev.MergeCabalConfig   ( mergeFields, removeFlaggedFields )
 
 actions :: CI.CabalCommand -> CommandActions
 actions cc = CommandActions
@@ -101,6 +101,7 @@ setup s cabal flgs cc = do
       let rew = R.Rewrite cabalHome (sandbox s) (pkgConf s) (CI.needsQuotes features)
           cOut = show $ R.ppTopLevel $ concat $
                  R.rewriteCabalConfig rew $
+                 removeFlaggedFields $
                  foldr (flip mergeFields) userFields (devFields:extraConfigs)
 
       writeUTF8File cfgOut cOut
