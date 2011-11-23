@@ -8,8 +8,7 @@ Puts local source packages into a repository readable by cabal-install
 -}
 {-# LANGUAGE CPP #-}
 module Distribution.Dev.AddSource
-    ( actions
-    )
+    ( actions, addSources)
 where
 
 #ifndef MIN_VERSION_Cabal
