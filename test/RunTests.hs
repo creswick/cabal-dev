@@ -33,7 +33,7 @@ import Distribution.Dev.Sandbox ( newSandbox, pkgConf, Sandbox, KnownVersion, sa
 import System.IO ( withBinaryFile, IOMode(ReadMode) )
 import System.Cmd ( rawSystem )
 import System.Process ( readProcessWithExitCode )
-import System.Directory ( getTemporaryDirectory, createDirectory )
+import System.Directory ( getTemporaryDirectory, createDirectory, removeFile )
 import System.Environment ( getArgs )
 import System.Exit ( ExitCode(ExitSuccess) )
 import System.FilePath ( (</>), (<.>), takeExtension )
@@ -59,6 +59,8 @@ tests v p =
         addSourceStaysSandboxed v p "fake-package."
       , testCase "add-source stays sandboxed (dir with spaces)" $
         addSourceStaysSandboxed v p "fake package."
+      , testCase "add-source-list stays sandboxed" $
+        addSourceListStaysSandboxed v p "fake-package."
       , testCase "Builds ok regardless of the state of the logs directory" $
         assertLogLocationOk v p
       , testCase "Index tar files contain all contents" $
@@ -191,12 +193,29 @@ assertProgram desc f progPath progArgs = do
                    ]
   HUnit.assertBool msg $ f res
 
--- |Check that cabal-dev add-source makes a package installable by
--- cabal-dev and that cabal-dev install for that package afterwards
--- makes it available in the sandbox, but not outside.
+addSourceListStaysSandboxed :: Verbosity -> FilePath -> FilePath
+                            -> HUnit.Assertion
+addSourceListStaysSandboxed v cabalDev dirName = do
+    catch runTest $ \_ -> return ()
+    removeFile sourceList
+  where
+    sourceList = "source-list"
+    runTest = do
+      addSourceAnyStaysSandboxed v cabalDev dirName $ \packageDir -> do
+        writeFile sourceList packageDir 
+        return ("add-source-list", sourceList)
+
 addSourceStaysSandboxed :: Verbosity -> FilePath -> FilePath
                         -> HUnit.Assertion
 addSourceStaysSandboxed v cabalDev dirName =
+  addSourceAnyStaysSandboxed v cabalDev dirName $ \packageDir -> return ("add-source", packageDir)
+
+-- |Check that cabal-dev add-source makes a package installable by
+-- cabal-dev and that cabal-dev install for that package afterwards
+-- makes it available in the sandbox, but not outside.
+addSourceAnyStaysSandboxed :: Verbosity -> FilePath -> FilePath -> (FilePath -> IO (String, String))
+                        -> HUnit.Assertion
+addSourceAnyStaysSandboxed v cabalDev dirName addSource =
     withTempPackage v dirName $ \readPackageIndex packageDir sb pId -> do
       let pkgStr = display pId
       sbPkgs <- readPackageIndex (privateStack sb)
@@ -222,7 +241,8 @@ addSourceStaysSandboxed v cabalDev dirName =
       -- with an empty package index
       withCabalDev assertExitsFailure ["install", pkgStr]
 
-      withCabalDev assertExitsSuccess ["add-source", packageDir]
+      (com,arg) <- addSource packageDir
+      withCabalDev assertExitsSuccess [com, arg]
 
       -- Do the installation. Now this library should be registered
       -- with GHC

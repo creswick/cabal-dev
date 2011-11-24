@@ -21,7 +21,7 @@ import Distribution.Dev.Flags ( parseGlobalFlags, helpRequested, globalOpts
                               , getVerbosity, Config
                               )
 import qualified Distribution.Dev.AddSource as AddSource
-import qualified Distribution.Dev.AddSourceFile as AddSourceFile
+import qualified Distribution.Dev.AddSourceList as AddSourceList
 import qualified Distribution.Dev.Ghci as Ghci
 import qualified Distribution.Dev.InvokeCabal as InvokeCabal
 import qualified Distribution.Dev.InstallDependencies as InstallDeps
@@ -41,9 +41,9 @@ cabalDevCommands = [ ( "add-source"
                        "package in the sandbox, and does require the " ++
                        "package to have a working sdist."
                      )
-                   , ( "add-source-file"
-                     , AddSourceFile.actions
-                     , "Same as add-source, but load multiple sources from a file"
+                   , ( "add-source-list"
+                     , AddSourceList.actions
+                     , "Same result as add-source. Load multiple sources at once listed in a file"
                      )
                    , ( "install-deps"
                      , InstallDeps.actions

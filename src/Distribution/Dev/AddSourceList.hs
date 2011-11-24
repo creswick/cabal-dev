@@ -1,17 +1,18 @@
 {- Copyright (c) 2011 Galois, Inc. -}
 {-|
-add-source-file command
+add-source-list command
 
 Puts local source packages into a repository readable by cabal-install
 -}
-module Distribution.Dev.AddSourceFile ( actions) where
+module Distribution.Dev.AddSourceList ( actions) where
 
 import Distribution.Dev.AddSource (addSources)
 import Distribution.Dev.Command ( CommandActions(..), CommandResult(..) )
 import Distribution.Dev.Flags   ( Config, getVerbosity )
 import Distribution.Simple.Utils ( debug )
 import System.Console.GetOpt                 ( OptDescr(..) )
-import Control.Monad.Trans                   ( liftIO )
+
+import System.FilePath ( takeDirectory, (</>) )
 
 actions :: CommandActions
 actions = CommandActions
@@ -26,13 +27,21 @@ addSourcesFromFiles _    [] = return $ CommandError "No source file supplied"
 addSourcesFromFiles flgs fns = do
   let v = getVerbosity flgs
   debug v $ "Adding source files" ++ show fns
-  localDeps <- mapM (liftIO . fmap lines . readFile) fns
+  localDeps <- mapM localPathsFromFile fns
   doCommands (map (addSources flgs) localDeps)
+  where
+    doCommands :: [IO CommandResult] -> IO CommandResult
+    doCommands [] = return CommandOk
+    doCommands (c:commands) = do
+      r <- c
+      case r of
+        CommandOk -> doCommands commands
+        e         -> return e
 
-doCommands :: [IO CommandResult] -> IO CommandResult
-doCommands [] = return CommandOk
-doCommands (c:commands) = do
-  r <- c
-  case r of
-    CommandOk -> doCommands commands
-    e         -> return e
+    localPathsFromFile :: FilePath -> IO [String]
+    localPathsFromFile file = do
+      fileRelativeDeps <- (fmap lines . readFile) file
+      return $ map dirname fileRelativeDeps
+      where 
+        dirname s = (takeDirectory file) </> s
+
