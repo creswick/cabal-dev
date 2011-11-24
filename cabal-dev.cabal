@@ -118,6 +118,7 @@ Executable cabal-dev
 
   Other-modules:
     Distribution.Dev.AddSource,
+    Distribution.Dev.AddSourceList,
     Distribution.Dev.BuildOpts,
     Distribution.Dev.CabalInstall,
     Distribution.Dev.Command,
