@@ -42,9 +42,6 @@ import Test.Framework ( defaultMainWithArgs, Test, testGroup )
 import Test.Framework.Providers.HUnit ( testCase )
 import Test.HUnit ( (@?=) )
 import qualified Test.HUnit as HUnit
-
-import Distribution.Client.Config -- ( parseConfig )
-import Distribution.Client.Setup ( GlobalFlags(..) )
 import Distribution.Simple.InstallDirs
 import Distribution.Simple.Setup
 import Distribution.ParseUtils
@@ -63,13 +60,6 @@ tests v p =
         assertLogLocationOk v p
       , testCase "Index tar files contain all contents" $
         assertTarFileOk v p
-      ]
-    , testGroup "Parsing and serializing" $
-      [ testCase "simple round-trip test" $
-        assertRoundTrip
-
-      -- , testCase "sample echo test" $
-      --   configEcho
       ]
     ]
 
@@ -103,56 +93,6 @@ main = do
             []     -> ("cabal-dev", [])
 
   defaultMainWithArgs (tests normal cabalDev) testFrameworkArgs
-
--- |Test that parsing and serializing a cabal-install SavedConfig with
--- spaces in the paths preserves the spaces properly.
---
--- This tests only a select few of the fields and leaves the rest
--- empty. In practice, this has proven to be adequate.
---
--- This is really just testing that cabal-install is capable of
--- handling these fields. We have baked in knowledge of the syntax
--- that these fields need into RewriteCabalConfig. Ideally,
--- RewriteCabalConfig would read/write the data structure using the
--- code from cabal-install. We haven't done that because pulling in
--- all of the code from cabal-install into a production build is
--- pretty hackish. I think that cabal-dev ought to be a fork or
--- alternate build of cabal-install.
---
--- Note that this test is the whole reason that we have the custom
--- build type.
-assertRoundTrip :: HUnit.Assertion
-assertRoundTrip =
-    do parsed <- case parseConfig mempty $ showConfig configWithSpaces of
-                   ParseFailed err -> fail $ "Parse failed: " ++ show err
-                   ParseOk _ val   -> return val
-
-       let check msg f =
-               (HUnit.assertEqual msg `on` f) parsed configWithSpaces
-
-       check "globalLocalRepos" (globalLocalRepos . savedGlobalFlags)
-       check "cache" (globalCacheDir . savedGlobalFlags)
-       check "prefix" (show . prefix . savedUserInstallDirs)
-       check "bindir" (show . bindir . savedUserInstallDirs)
-       check "packageDB" (configPackageDB . savedConfigureFlags)
-    where
-      configWithSpaces =
-          mempty { savedGlobalFlags =
-                   mempty { globalLocalRepos = [pfx "repos"]
-                          , globalCacheDir = toFlag $ pfx "cache"
-                          }
-                 , savedUserInstallDirs =
-                   mempty { prefix = toFlag $ toPathTemplate $ pfx ""
-                          , bindir = toFlag $ toPathTemplate $ pfx "binaries"
-                          }
-                 , savedConfigureFlags =
-                   mempty { configPackageDB =
-                            toFlag $ SpecificPackageDB $ pfx "package.db"
-                          }
-                 }
-
-      pfx = ("/path with spaces" </>)
-
 
 assertProgramOutput :: (String -> Bool) -> FilePath -> [String]
                     -> HUnit.Assertion
