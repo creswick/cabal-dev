@@ -24,14 +24,29 @@ Description:         cabal-dev is a tool for managing development builds of
                      .
                      @cabal-dev add-source@ also supports importing tarballs
                      into a local cabal repository.
+                     .
+                     Alternatively, install unreleased dependencies into the
+                     target cabal-dev sandbox instead of using @add-source@:
+                     .
+                     > cd /path/to/dependency
+                     > cabal-dev install --sandobox=/path/to/sandbox
+                     .
+                     Then build your library/application with the specified
+                     sandbox.
+                     .
+                     .
+                     Additional documentation can be found in the README.md on
+                     github:
+                     .
+                     http://github.com/creswick/cabal-dev/blob/master/README.md
 
 License:             BSD3
 License-file:        LICENSE
 Author:              Josh Hoyt, Jonathan Daugherty, Rogan Creswick
 Maintainer:          j3h@galois.com, jtd@galois.com, creswick@galois.com
-Homepage:            https://github.com/creswick/cabal-dev
-Bug-Reports:         https://github.com/creswick/cabal-dev/issues
-Copyright:           2011 Galois, Inc.
+Homepage:            http://github.com/creswick/cabal-dev
+Bug-Reports:         http://github.com/creswick/cabal-dev/issues
+Copyright:           2010-2012 Galois, Inc.
 Category:            Development
 Build-type:          Custom
 Cabal-version:       >=1.6
