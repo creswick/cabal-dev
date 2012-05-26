@@ -29,7 +29,7 @@ Description:         cabal-dev is a tool for managing development builds of
                      target cabal-dev sandbox instead of using @add-source@:
                      .
                      > cd /path/to/dependency
-                     > cabal-dev install --sandobox=/path/to/sandbox
+                     > cabal-dev install --sandbox=/path/to/sandbox
                      .
                      Then build your library/application with the specified
                      sandbox.
@@ -38,7 +38,7 @@ Description:         cabal-dev is a tool for managing development builds of
                      Additional documentation can be found in the README.md on
                      github:
                      .
-                     http://github.com/creswick/cabal-dev/blob/master/README.md
+                     <http://github.com/creswick/cabal-dev/blob/master/README.md>
 
 License:             BSD3
 License-file:        LICENSE
