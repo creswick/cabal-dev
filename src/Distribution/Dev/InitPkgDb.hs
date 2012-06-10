@@ -42,11 +42,11 @@ initPkgDb v s = do
       s' = setVersion s typ ver
       pth = pkgConf s'
 
-  case typ of
-    GHC_6_12_Db -> do
+  if typ >= GHC_6_12_Db
+    then do
       e <- doesDirectoryExist pth
       unless e $ run v ghcPkg ["init", pth]
-    _ -> do
+    else do
       e <- doesFileExist pth
       unless e $ writeFile pth "[]"
 
@@ -69,5 +69,6 @@ ghcPackageDbType p =
         let typ | v < Version [6, 10] [] = GHC_6_8_Db $ locationPath $
                                            programLocation p
                 | v < Version [6, 12] [] = GHC_6_10_Db
+                | v >= Version [7, 5] [] = GHC_7_5_Plus_Db
                 | otherwise              = GHC_6_12_Db
         return (v, typ)

@@ -35,8 +35,12 @@ invokeGhcPkg cfg args = do
   s <- initPkgDb v =<< resolveSandbox cfg
   (ghcPkg, _) <- requireProgram v ghcPkgProgram emptyProgramConfiguration
   let extraArgs = case getVersion s of
-                    GHC_6_8_Db _ -> id
-                    _            -> ("--no-user-package-conf":)
+                    GHC_6_8_Db _    -> id
+                    GHC_7_5_Plus_Db -> ("--no-user-package-db":)
+                    _               -> ("--no-user-package-conf":)
+      pkgConfArgName = case getVersion s of
+                         GHC_7_5_Plus_Db -> "--package-db"
+                         _               -> "--package-conf"
 
-  runProgram v ghcPkg $ extraArgs $ "--global" : "--package-conf" : pkgConf s : args
+  runProgram v ghcPkg $ extraArgs $ "--global" : pkgConfArgName : pkgConf s : args
   return CommandOk
