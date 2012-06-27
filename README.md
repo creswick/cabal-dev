@@ -76,7 +76,7 @@ reflect what cabal-dev does when it causes compilation).
 Cabal-dev supports two different workflows for using un-released
 packages. The first makes the dependencies available in a
 sandbox-local Hackage. The second rebuilds the dependent package every
-time. If any of your provate dependencies are unchanging (e.g. you had
+time. If any of your private dependencies are unchanging (e.g. you had
 to patch a dependency to relax a package constraint) you will probably
 want to use add-source. If you are actively developing two packages
 that have dependencies on each other, you probably will prefer the
