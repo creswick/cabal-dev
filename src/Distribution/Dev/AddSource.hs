@@ -6,7 +6,7 @@ add-source command
 Puts local source packages into a repository readable by cabal-install
 
 -}
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, ScopedTypeVariables #-}
 module Distribution.Dev.AddSource
     ( actions
     )
@@ -73,6 +73,7 @@ import Distribution.Dev.Flags   ( Config, getVerbosity )
 import Distribution.Dev.Sandbox ( resolveSandbox, localRepoPath
                                 , Sandbox, indexTar, indexTarBase
                                 )
+import qualified Control.Exception  as E (catch, IOException)
 
 import Distribution.Simple.Utils ( debug, notice )
 
@@ -102,7 +103,7 @@ addSources flgs fns = do
         res <- readExistingIndex sandbox
         case res of
           Left err -> return $
-                 CommandError $ "Error reading existing index: " ++ err
+                 CommandError $ "Error reading existing index: " ++ (show err)
           Right existingIndex ->
               do let newIndex = mergeIndices existingIndex newEntries
                  -- Now we have the new index ready and have
@@ -152,9 +153,9 @@ toIndexEntry pkgId c = right toEnt $ T.toTarPath False (indexName pkgId)
 -- |Read an existing index tarball from the local repository, if one
 -- exists. If the file does not exist, behave as if the index has no
 -- entries.
-readExistingIndex :: Sandbox a -> IO (Either String [T.Entry])
+readExistingIndex :: Sandbox a -> IO (Either T.FormatError [T.Entry])
 readExistingIndex sandbox =
-    readIndexFile `catch` \e ->
+    readIndexFile `E.catch` \(e::E.IOException) ->
         if isDoesNotExistError e
         then return $ Right []
         else ioError e
@@ -300,7 +301,7 @@ displayPackageName = id
 -- file
 processDirectory :: V.Verbosity -> FilePath
                  -> IO (Either String (PackageIdentifier, L.ByteString, PackageDescription))
-processDirectory v d = go `catch` \e ->
+processDirectory v d = go `E.catch` \(e::E.IOException) ->
                      if expected e
                      then return $ Left $ show e
                      else ioError e
@@ -344,7 +345,7 @@ forcedBS :: L.ByteString -> IO L.ByteString
 forcedBS bs = forceBS bs >> return bs
 
 -- |Extract a cabal file from a package tarball
-extractCabalFile :: T.Entries -> Maybe (PackageIdentifier, L.ByteString, PackageDescription)
+extractCabalFile :: T.Entries T.FormatError -> Maybe (PackageIdentifier, L.ByteString, PackageDescription)
 extractCabalFile = T.foldEntries step Nothing (const Nothing)
     where
       step ent Nothing = (,,) <$> entPackageId ent <*> entBytes ent <*> (parseDesc $ entBytes ent)
