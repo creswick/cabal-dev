@@ -6,7 +6,7 @@ add-source command
 Puts local source packages into a repository readable by cabal-install
 
 -}
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, ScopedTypeVariables #-}
 module Distribution.Dev.AddSource
     ( actions
     )
@@ -73,6 +73,7 @@ import Distribution.Dev.Flags   ( Config, getVerbosity )
 import Distribution.Dev.Sandbox ( resolveSandbox, localRepoPath
                                 , Sandbox, indexTar, indexTarBase
                                 )
+import qualified Control.Exception  as E (catch, IOException)
 
 import Distribution.Simple.Utils ( debug, notice )
 
@@ -154,7 +155,7 @@ toIndexEntry pkgId c = right toEnt $ T.toTarPath False (indexName pkgId)
 -- entries.
 readExistingIndex :: Sandbox a -> IO (Either T.FormatError [T.Entry])
 readExistingIndex sandbox =
-    readIndexFile `catch` \e ->
+    readIndexFile `E.catch` \(e::E.IOException) ->
         if isDoesNotExistError e
         then return $ Right []
         else ioError e
@@ -300,7 +301,7 @@ displayPackageName = id
 -- file
 processDirectory :: V.Verbosity -> FilePath
                  -> IO (Either String (PackageIdentifier, L.ByteString, PackageDescription))
-processDirectory v d = go `catch` \e ->
+processDirectory v d = go `E.catch` \(e::E.IOException) ->
                      if expected e
                      then return $ Left $ show e
                      else ioError e

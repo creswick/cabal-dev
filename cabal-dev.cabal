@@ -91,9 +91,13 @@ Executable cabal-dev
 
     -- Containers 0.2 did not specify a constraint on base, so we
     -- avoid using it:
-    if impl(ghc >= 6.12)
+    if impl(ghc >= 6.12 && < 7.6)
       Build-depends:
         containers >= 0.3 && < 0.5
+
+    if impl(ghc >= 7.6)
+      Build-depends:
+        containers >= 0.5 && < 0.6
 
     -- Require this specific version that came with GHC 6.10 because
     -- of packaging problems with containers-0.2

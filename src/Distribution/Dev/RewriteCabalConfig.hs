@@ -9,6 +9,7 @@ This module is written so that it will work out-of-the-box with GHC >=
 6.8 && < 6.13 with no other packages installed.
 
 -}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Distribution.Dev.RewriteCabalConfig
     ( rewriteCabalConfig
     , Rewrite(..)
@@ -24,6 +25,7 @@ import Data.Traversable          ( traverse, Traversable )
 import Distribution.ParseUtils   ( Field(..), readFields, ParseResult(..) )
 import Distribution.Simple.Utils ( readUTF8File )
 import Text.PrettyPrint.HughesPJ
+import qualified Control.Exception  as E (catch, IOException) 
 
 data Rewrite = Rewrite { homeDir          :: FilePath
                        , sandboxDir       :: FilePath
@@ -39,7 +41,7 @@ readConfig s = case readFields s of
 -- XXX: we should avoid this lazy IO that leaks a file handle.
 readConfigF :: FilePath -> IO (Either String [Field])
 readConfigF fn =
-    (readConfig <$> readUTF8File fn) `catch` \e -> return $ Left $ show e
+    (readConfig <$> readUTF8File fn) `E.catch` (\(e::E.IOException) -> return $ Left $ show e)
 
 readConfigF_ :: FilePath -> IO [Field]
 readConfigF_ fn = either error id <$> readConfigF fn
