@@ -16,6 +16,10 @@ where
 #define MIN_VERSION_Cabal(a,b,c) 1
 #endif
 
+#ifndef MIN_VERSION_base
+#define MIN_VERSION_base(a,b,c) 1
+#endif
+
 import Control.Applicative                   ( (<$>), (<*>) )
 import Control.Arrow                         ( right )
 import Control.Exception                     ( bracket )
@@ -59,6 +63,9 @@ import System.FilePath                       ( takeExtension, takeBaseName
 import System.IO                             ( withBinaryFile, IOMode(..), hClose
                                              , openTempFile, hFlush, hSetBinaryMode
                                              )
+#if MIN_VERSION_base(4,4,0)
+import System.IO.Error                       ( catchIOError )
+#endif
 import System.IO.Error                       ( isDoesNotExistError )
 
 import qualified Codec.Archive.Tar           as T
@@ -75,6 +82,10 @@ import Distribution.Dev.Sandbox ( resolveSandbox, localRepoPath
                                 )
 
 import Distribution.Simple.Utils ( debug, notice )
+       
+#if !MIN_VERSION_base(4,4,0)
+catchIOError = catch
+#endif
 
 actions :: CommandActions
 actions = CommandActions
@@ -102,7 +113,7 @@ addSources flgs fns = do
         res <- readExistingIndex sandbox
         case res of
           Left err -> return $
-                 CommandError $ "Error reading existing index: " ++ err
+                 CommandError $ "Error reading existing index: " ++ show err
           Right existingIndex ->
               do let newIndex = mergeIndices existingIndex newEntries
                  -- Now we have the new index ready and have
@@ -152,9 +163,9 @@ toIndexEntry pkgId c = right toEnt $ T.toTarPath False (indexName pkgId)
 -- |Read an existing index tarball from the local repository, if one
 -- exists. If the file does not exist, behave as if the index has no
 -- entries.
-readExistingIndex :: Sandbox a -> IO (Either String [T.Entry])
+readExistingIndex :: Sandbox a -> IO (Either T.FormatError [T.Entry])
 readExistingIndex sandbox =
-    readIndexFile `catch` \e ->
+    readIndexFile `catchIOError` \e ->
         if isDoesNotExistError e
         then return $ Right []
         else ioError e
@@ -300,7 +311,7 @@ displayPackageName = id
 -- file
 processDirectory :: V.Verbosity -> FilePath
                  -> IO (Either String (PackageIdentifier, L.ByteString, PackageDescription))
-processDirectory v d = go `catch` \e ->
+processDirectory v d = go `catchIOError` \e ->
                      if expected e
                      then return $ Left $ show e
                      else ioError e
@@ -344,7 +355,7 @@ forcedBS :: L.ByteString -> IO L.ByteString
 forcedBS bs = forceBS bs >> return bs
 
 -- |Extract a cabal file from a package tarball
-extractCabalFile :: T.Entries -> Maybe (PackageIdentifier, L.ByteString, PackageDescription)
+extractCabalFile :: T.Entries e -> Maybe (PackageIdentifier, L.ByteString, PackageDescription)
 extractCabalFile = T.foldEntries step Nothing (const Nothing)
     where
       step ent Nothing = (,,) <$> entPackageId ent <*> entBytes ent <*> (parseDesc $ entBytes ent)
