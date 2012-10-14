@@ -93,7 +93,7 @@ Executable cabal-dev
     -- avoid using it:
     if impl(ghc >= 6.12)
       Build-depends:
-        containers >= 0.3 && < 0.5
+        containers >= 0.3 
 
     -- Require this specific version that came with GHC 6.10 because
     -- of packaging problems with containers-0.2
@@ -106,18 +106,18 @@ Executable cabal-dev
         containers == 0.1.0.2
 
     Build-depends:
-      bytestring >= 0.9 && < 0.10,
-      directory >= 1.0 && < 1.3,
-      filepath >= 1.1 && < 1.4,
-      Cabal >= 1.10.0.0 && < 1.15,
-      HTTP >= 4000.0.9 && < 4000.3,
-      mtl >= 1.1 && < 2.2,
-      network >= 2.2 && < 2.4,
-      pretty >= 1.0 && < 1.2,
-      process >= 1.0 && < 1.2,
-      tar >= 0.3 && < 0.4,
-      zlib >= 0.5 && < 0.6,
-      transformers >= 0.2 && < 0.4,
+      bytestring >= 0.9 ,
+      directory >= 1.0 ,
+      filepath >= 1.1 ,
+      Cabal >= 1.10.0.0 ,
+      HTTP >= 4000.0.9 ,
+      mtl >= 1.1 ,
+      network >= 2.2 ,
+      pretty >= 1.0 ,
+      process >= 1.0 ,
+      tar >= 0.3 ,
+      zlib >= 0.5 ,
+      transformers >= 0.2 ,
 
       -- Template haskell is special: the compiler will die if a
       -- version other than the one that is shipped with the compiler
@@ -154,7 +154,7 @@ Executable ghc-pkg-6_8-compat
   Main-is: GhcPkgCompat.hs
   Build-Depends:
     base < 5,
-    Cabal >=1.2 && < 1.15
+    Cabal >=1.2 
 
   GHC-Options: -Wall
   HS-Source-Dirs: src

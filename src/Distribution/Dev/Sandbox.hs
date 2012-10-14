@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, GADTs, EmptyDataDecls #-}
+{-# LANGUAGE CPP, GADTs, EmptyDataDecls, ScopedTypeVariables #-}
 module Distribution.Dev.Sandbox
     ( KnownVersion
     , PackageDbType(..)
@@ -18,6 +18,7 @@ module Distribution.Dev.Sandbox
 where
 
 import Control.Monad             ( unless )
+import Control.Exception         ( IOException, catch )
 import Data.Version              ( Version, showVersion )
 import Distribution.Simple.Utils ( debug )
 import Distribution.Verbosity    ( Verbosity )
@@ -94,7 +95,7 @@ newSandbox v relSandboxDir = do
 vista32Workaround_createDirectoryIfMissing :: Bool -> FilePath -> IO ()
 vista32Workaround_createDirectoryIfMissing b fp =
 #ifdef mingw32_HOST_OS
-  createDirectoryIfMissing b fp `catch` \e -> do
+  createDirectoryIfMissing b fp `catch` \(e :: IOException) -> do
     erCode <- getLastError
     case erCode of
       1006 -> hPutStrLn stderr "Directory already exists--error swallowed"

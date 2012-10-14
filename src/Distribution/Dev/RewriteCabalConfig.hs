@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {- Copyright (c) 2011 Galois, Inc. -}
 {-|
 
@@ -19,6 +20,7 @@ module Distribution.Dev.RewriteCabalConfig
 where
 
 import Control.Applicative       ( Applicative, pure, (<$>) )
+import Control.Exception         ( catch, IOException)
 import Data.Maybe                ( fromMaybe )
 import Data.Traversable          ( traverse, Traversable )
 import Distribution.ParseUtils   ( Field(..), readFields, ParseResult(..) )
@@ -39,7 +41,8 @@ readConfig s = case readFields s of
 -- XXX: we should avoid this lazy IO that leaks a file handle.
 readConfigF :: FilePath -> IO (Either String [Field])
 readConfigF fn =
-    (readConfig <$> readUTF8File fn) `catch` \e -> return $ Left $ show e
+    (readConfig <$> readUTF8File fn) `catch` 
+      \(e :: IOException) -> return $ Left $ show e
 
 readConfigF_ :: FilePath -> IO [Field]
 readConfigF_ fn = either error id <$> readConfigF fn
