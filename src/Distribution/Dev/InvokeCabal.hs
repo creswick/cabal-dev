@@ -18,9 +18,8 @@ import Distribution.Simple.Program ( Program( programFindLocation )
                                    , runProgram
                                    , simpleProgram
                                    )
-import Distribution.Simple.Utils ( writeUTF8File, debug, cabalVersion
-                                 , readUTF8File )
-import Distribution.ParseUtils ( ParseResult(..), Field, readFields )
+import Distribution.Simple.Utils ( writeUTF8File, debug, cabalVersion)
+import Distribution.ParseUtils ( Field )
 import Distribution.Version ( Version(..) )
 import System.Console.GetOpt  ( OptDescr )
 
