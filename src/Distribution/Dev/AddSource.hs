@@ -16,6 +16,10 @@ where
 #define MIN_VERSION_Cabal(a,b,c) 1
 #endif
 
+#ifdef NO_PRELUDE_CATCH
+import Control.Exception ( catch )
+#endif
+
 import Control.Applicative                   ( (<$>), (<*>) )
 import Control.Arrow                         ( right )
 import Control.Exception                     ( bracket )
