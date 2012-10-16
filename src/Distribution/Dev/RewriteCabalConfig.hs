@@ -9,6 +9,8 @@ This module is written so that it will work out-of-the-box with GHC >=
 6.8 && < 6.13 with no other packages installed.
 
 -}
+{-# LANGUAGE CPP #-}
+
 module Distribution.Dev.RewriteCabalConfig
     ( rewriteCabalConfig
     , Rewrite(..)
@@ -17,6 +19,10 @@ module Distribution.Dev.RewriteCabalConfig
     , readConfigF_
     )
 where
+
+#ifdef NO_PRELUDE_CATCH
+import Control.Exception         ( catch, IOException )
+#endif
 
 import Control.Applicative       ( Applicative, pure, (<$>) )
 import Data.Maybe                ( fromMaybe )
@@ -38,8 +44,14 @@ readConfig s = case readFields s of
 
 -- XXX: we should avoid this lazy IO that leaks a file handle.
 readConfigF :: FilePath -> IO (Either String [Field])
-readConfigF fn =
-    (readConfig <$> readUTF8File fn) `catch` \e -> return $ Left $ show e
+readConfigF fn = (readConfig <$> readUTF8File fn) `catch` handler
+  where
+#ifdef NO_PRELUDE_CATCH
+    handler :: IOException -> IO (Either String [Field])
+    handler  = return . Left . show
+#else
+    handler  = return . Left . show
+#endif
 
 readConfigF_ :: FilePath -> IO [Field]
 readConfigF_ fn = either error id <$> readConfigF fn
@@ -72,8 +84,8 @@ rewriteField expand field =
       F l name val -> F l name <$> rewriteLeaf name val
       Section l name key fs -> Section l name key <$>
                                rewriteSection name fs
-      _ -> error $ "Only top-level fields and sections \ 
-                   \supported. Not: " ++ show field
+      _ -> error $ "Only top-level fields and sections "
+                ++ "supported. Not: " ++ show field
     where
       rewriteLeaf name val
           | name `elem` eLeaves expand = eExpand expand val
