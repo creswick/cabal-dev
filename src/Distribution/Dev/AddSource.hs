@@ -164,7 +164,7 @@ readExistingIndex sandbox =
       forceEntries es =
         let step _ l@(Left _) = l
             step x (Right xs) = Right (x:xs)
-            es' = T.foldEntries step (Right []) Left es
+            es' = T.foldEntries step (Right []) (Left . show) es
         in either (const 0) length es' `seq` return es'
 
 
@@ -344,7 +344,7 @@ forcedBS :: L.ByteString -> IO L.ByteString
 forcedBS bs = forceBS bs >> return bs
 
 -- |Extract a cabal file from a package tarball
-extractCabalFile :: T.Entries -> Maybe (PackageIdentifier, L.ByteString, PackageDescription)
+extractCabalFile :: T.Entries T.FormatError -> Maybe (PackageIdentifier, L.ByteString, PackageDescription)
 extractCabalFile = T.foldEntries step Nothing (const Nothing)
     where
       step ent Nothing = (,,) <$> entPackageId ent <*> entBytes ent <*> (parseDesc $ entBytes ent)
