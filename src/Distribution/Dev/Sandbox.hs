@@ -25,6 +25,10 @@ import System.Directory          ( createDirectoryIfMissing
                                  , doesFileExist, copyFile )
 import System.FilePath           ( (</>) )
 
+#ifdef NO_PRELUDE_CATCH
+import Control.Exception ( catch )
+#endif
+
 #ifdef mingw32_HOST_OS
 import System.IO ( hPutStrLn, stderr )
 import System.Win32.Types ( getLastError )
