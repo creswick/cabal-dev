@@ -49,7 +49,11 @@ data Sandbox a where
     UnknownVersion :: FilePath -> Sandbox UnknownVersion
     KnownVersion :: FilePath -> PackageDbType -> Version -> Sandbox KnownVersion
 
-data PackageDbType = GHC_6_8_Db FilePath | GHC_6_10_Db | GHC_6_12_Db
+data PackageDbType = GHC_6_8_Db FilePath
+                   | GHC_6_10_Db
+                   | GHC_6_12_Db
+                   | GHC_7_5_Plus_Db
+                   deriving (Eq, Ord, Show)
 
 -- NOTE: GHC < 6.12: compilation warnings about non-exhaustive pattern
 -- matches are spurious (we'd get a type error if we tried to make
