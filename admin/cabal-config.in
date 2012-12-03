@@ -14,7 +14,7 @@
 -- cabal-install, the behavior is undefined for cabal-install.
 --
 -- These symbols are redfined to mean the following:
---  
+--
 --  ~ Tilde now means 'the user's default cabal directory' This is
 --    defined by getAppUserDataDirectory, which differs somewhat on
 --    each OS.
@@ -29,8 +29,8 @@ local-repo: ./packages
 -- with-compiler:
 -- with-hc-pkg:
 -- scratchdir:
--- program-prefix: 
--- program-suffix: 
+-- program-prefix:
+-- program-suffix:
 -- library-vanilla: True
 -- library-profiling: False
 -- shared: False
@@ -61,11 +61,11 @@ install-dirs user
   prefix: ./
   -- bindir: $prefix/bin
   -- libdir: $prefix/lib
-  -- libsubdir: $pkgid/$compiler
-  -- libexecdir: $prefix/libexec
+  libsubdir: $pkgid/$compiler
+  libexecdir: $prefix/libexec
   -- datadir: $prefix/share
   -- datasubdir: $pkgid
-  -- docdir: $datadir/doc/$pkgid
+  docdir: $datadir/doc/$pkgid
   -- htmldir: $docdir/html
   -- haddockdir: $htmldir
 
@@ -73,10 +73,10 @@ install-dirs global
   prefix: ./
   -- bindir: $prefix/bin
   -- libdir: $prefix/lib
-  -- libsubdir: $pkgid/$compiler
-  -- libexecdir: $prefix/libexec
+  libsubdir: $pkgid/$compiler
+  libexecdir: $prefix/libexec
   -- datadir: $prefix/share
   -- datasubdir: $pkgid
-  -- docdir: $datadir/doc/$pkgid
+  docdir: $datadir/doc/$pkgid
   -- htmldir: $docdir/html
   -- haddockdir: $htmldir
