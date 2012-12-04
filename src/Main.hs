@@ -9,7 +9,9 @@ import Data.Maybe ( listToMaybe )
 import Data.Version ( showVersion )
 import Control.Monad ( unless )
 import System.Exit ( exitWith, ExitCode(..) )
-import System.Environment ( getArgs, getProgName )
+import System.Environment ( getArgs, getProgName, getEnvironment )
+import System.SetEnv (setEnv)
+import System.FilePath ((</>), searchPathSeparator)
 import System.Console.GetOpt ( usageInfo, getOpt, ArgOrder(Permute) )
 import Distribution.Simple.Utils ( cabalVersion, debug )
 import Distribution.Text ( display )
@@ -18,7 +20,7 @@ import Control.Monad.Trans.State ( evalState, gets, modify )
 import Distribution.Dev.Command ( CommandActions(..), CommandResult(..) )
 import Distribution.Dev.Flags ( parseGlobalFlags, helpRequested, globalOpts
                               , GlobalFlag(Version), getOpt'', fromFlags
-                              , getVerbosity, Config
+                              , getVerbosity, Config, getSandbox
                               )
 import qualified Distribution.Dev.AddSource as AddSource
 import qualified Distribution.Dev.Ghci as Ghci
@@ -100,12 +102,20 @@ main = do
          putStr =<< globalUsage
          exitWith (ExitFailure 1)
 
+  let cfg = fromFlags globalFlags
+
+  -- add sandbox bin dir to PATH, so that custom preprocessors that are
+  -- installed into the sandbox are found
+  let binDir = getSandbox cfg </> "bin"
+  mPath <- lookup "PATH" `fmap` getEnvironment
+  let path = maybe binDir ((binDir ++ [searchPathSeparator]) ++) mPath
+  setEnv "PATH" path
+
   case [f|(Version f) <- globalFlags] of
     (True:_) -> printNumericVersion
     (False:_) -> printVersion
     [] -> return ()
 
-  let cfg = fromFlags globalFlags
   debug (getVerbosity cfg) versionString
 
   case args of
