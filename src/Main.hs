@@ -9,7 +9,8 @@ import Data.Maybe ( listToMaybe )
 import Data.Version ( showVersion )
 import Control.Monad ( unless )
 import System.Exit ( exitWith, ExitCode(..) )
-import System.Environment ( getArgs, getProgName, getEnvironment )
+import System.Environment ( getArgs, getProgName, getEnv )
+import System.IO.Error ( catchIOError )
 import System.SetEnv (setEnv)
 import System.FilePath ((</>), searchPathSeparator)
 import System.Console.GetOpt ( usageInfo, getOpt, ArgOrder(Permute) )
@@ -107,7 +108,7 @@ main = do
   -- add sandbox bin dir to PATH, so that custom preprocessors that are
   -- installed into the sandbox are found
   let binDir = getSandbox cfg </> "bin"
-  mPath <- lookup "PATH" `fmap` getEnvironment
+  mPath <- maybeGetEnv "PATH"
   let path = maybe binDir ((binDir ++ [searchPathSeparator]) ++) mPath
   setEnv "PATH" path
 
@@ -268,3 +269,10 @@ splits w s = map (\k -> score k $ splitAt k s) [w - 1,w - 2..1]
           -- Other kinds of splits are not as bad as splitting
           -- between words, but are still pretty harmful.
           | otherwise  = w
+
+-- Return the value of the environment variable with the given name
+-- or Nothing if the variable is not defined.
+-- Probably should be replaced with System.Environment.lookupEnv
+-- when the base library is upgraded >= 4.6
+maybeGetEnv :: String -> IO (Maybe String)
+maybeGetEnv name = (Just `fmap` getEnv name) `catchIOError` const (return Nothing)
