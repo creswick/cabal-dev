@@ -30,7 +30,8 @@ invokeGhci cfg args = do
     Right (buildArgs:_) ->
         do -- Use the arguments that cabal-install passed to GHC to
            -- invoke ghci instead
-          let ghciArgs = "--interactive" : filter (/= "--make") buildArgs
+          let ghciArgs = "--interactive"
+                       : filter (not . (`elem` ["--make", "-O"])) buildArgs
           (ghc, _) <- requireProgram v ghcProgram emptyProgramConfiguration
           runProgram v ghc ghciArgs
           return CommandOk
