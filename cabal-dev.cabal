@@ -158,7 +158,8 @@ Executable ghc-pkg-6_8-compat
   Main-is: GhcPkgCompat.hs
   Build-Depends:
     base < 5,
-    Cabal >=1.2 && < 1.17
+    Cabal >=1.2 && < 1.17,
+    process >= 1.0 && < 1.2
 
   GHC-Options: -Wall
   HS-Source-Dirs: src
@@ -180,7 +181,7 @@ Executable cabal-dev-test
     Build-depends:
       MonadRandom >= 0.1 && < 0.2,
       random >= 1 && < 1.1,
-      test-framework >= 0.3 && < 0.6,
+      test-framework >= 0.3 && < 0.9,
       test-framework-hunit >= 0.2,
       HUnit >= 1.2 && <2
 
