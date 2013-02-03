@@ -1,5 +1,5 @@
 Name:                cabal-dev
-Version:             0.9.1
+Version:             0.9.2
 Synopsis:            Manage sandboxed Haskell build environments
 
 Description:         cabal-dev is a tool for managing development builds of
@@ -53,7 +53,7 @@ Cabal-version:       >=1.6
 Data-Files:
   admin/cabal-config.in,
   admin/00-index.tar
-Tested-with: GHC == 6.12.3, GHC == 6.10.4, GHC == 7.0.3, GHC == 7.4.1
+Tested-with: GHC == 6.12.3, GHC == 6.10.4, GHC == 7.0.3, GHC == 7.4.1, GHC == 7.6.2
 
 source-repository head
   type:        git
@@ -105,7 +105,7 @@ Executable cabal-dev
       Build-depends:
         containers == 0.1.0.2
 
-    if impl(ghc >= 7.6.1)
+    if impl(ghc > 7.6.1)
       CPP-Options: -DNO_PRELUDE_CATCH
 
     Build-depends:
