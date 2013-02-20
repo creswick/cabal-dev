@@ -33,10 +33,10 @@ import Distribution.Dev.Sandbox ( newSandbox, pkgConf, Sandbox, KnownVersion, sa
 import System.IO ( withBinaryFile, IOMode(ReadMode) )
 import System.Cmd ( rawSystem )
 import System.Process ( readProcessWithExitCode )
-import System.Directory ( getTemporaryDirectory, createDirectory )
+import System.Directory ( getTemporaryDirectory, createDirectory, doesFileExist, removeFile )
 import System.Environment ( getArgs )
 import System.Exit ( ExitCode(ExitSuccess) )
-import System.FilePath ( (</>), (<.>), takeExtension )
+import System.FilePath ( (</>), (<.>), takeExtension, replaceExtension )
 import System.Random ( RandomGen )
 import Test.Framework ( defaultMainWithArgs, Test, testGroup )
 import Test.Framework.Providers.HUnit ( testCase )
@@ -161,6 +161,14 @@ addSourceStaysSandboxed v cabalDev dirName =
       -- hackage. We should actually use a cabal-install config
       -- with an empty package index
       withCabalDev assertExitsFailure ["install", pkgStr]
+
+      -- XXX: https://github.com/haskell/cabal/issues/1213
+      -- Workaround for a cabal-install bug where the index cache
+      -- may be considered valid when it isn't due to a race condition
+      -- with the modification time.
+      let cacheFile = indexTar sb `replaceExtension` "cache"
+      cacheExists <- doesFileExist cacheFile
+      when cacheExists $ removeFile cacheFile
 
       withCabalDev assertExitsSuccess ["add-source", packageDir]
 
