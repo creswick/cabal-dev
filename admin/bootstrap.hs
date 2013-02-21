@@ -10,6 +10,7 @@
 import qualified Distribution.Dev.RewriteCabalConfig as R
 
 import Control.Applicative ( (<$>) )
+import qualified Control.Exception as Ex ( IOException, catch )
 import Data.List ( isPrefixOf )
 import Data.Version ( Version(..), showVersion, parseVersion )
 import Data.Maybe ( fromMaybe, maybeToList )
@@ -70,9 +71,10 @@ main = do
 -- The absolute path to the sandbox directory
 getSandbox :: IO FilePath
 getSandbox = let path = "cabal-dev"
-                 handler = do cwd <- getCurrentDirectory
-                              return $ cwd </> path
-             in (canonicalizePath path) `catch` \_->handler
+                 handler :: Ex.IOException -> IO FilePath
+                 handler e = do cwd <- getCurrentDirectory
+                                return $ cwd </> path
+             in (canonicalizePath path) `Ex.catch` handler
 
 ---------------------------------------------------------------------
 -- Identifying GHC version so that we know how to initialize and what

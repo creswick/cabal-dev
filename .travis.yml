@@ -1,0 +1,3 @@
+language: haskell
+script:
+  - cabal install && ./bin/runtests

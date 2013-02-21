@@ -17,6 +17,7 @@ module Distribution.Dev.Sandbox
     )
 where
 
+
 import Control.Monad             ( unless )
 import Data.Version              ( Version, showVersion )
 import Distribution.Simple.Utils ( debug )
@@ -25,13 +26,10 @@ import System.Directory          ( createDirectoryIfMissing
                                  , doesFileExist, copyFile )
 import System.FilePath           ( (</>) )
 
-#ifdef NO_PRELUDE_CATCH
-import Control.Exception ( catch )
-#endif
-
 #ifdef mingw32_HOST_OS
 import System.IO ( hPutStrLn, stderr )
 import System.Win32.Types ( getLastError )
+import qualified Control.Exception as Ex ( catch, IOException )
 #endif
 
 import qualified Distribution.Dev.Flags as F
@@ -102,7 +100,10 @@ newSandbox v relSandboxDir = do
 vista32Workaround_createDirectoryIfMissing :: Bool -> FilePath -> IO ()
 vista32Workaround_createDirectoryIfMissing b fp =
 #ifdef mingw32_HOST_OS
-  createDirectoryIfMissing b fp `catch` \e -> do
+  createDirectoryIfMissing b fp `Ex.catch` handler
+  where
+  handler :: Ex.IOException -> IO ()
+  handler e = do
     erCode <- getLastError
     case erCode of
       1006 -> hPutStrLn stderr "Directory already exists--error swallowed"

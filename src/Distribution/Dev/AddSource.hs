@@ -16,13 +16,9 @@ where
 #define MIN_VERSION_Cabal(a,b,c) 1
 #endif
 
-#ifdef NO_PRELUDE_CATCH
-import Control.Exception ( catch )
-#endif
-
 import Control.Applicative                   ( (<$>), (<*>) )
 import Control.Arrow                         ( right )
-import Control.Exception                     ( bracket )
+import qualified Control.Exception as Ex     ( catch, bracket )
 import Control.Monad                         ( guard, (<=<), forM_ )
 import Control.Monad.Error                   ( runErrorT, throwError )
 import Control.Monad.Trans                   ( liftIO )
@@ -136,7 +132,7 @@ writeIndex sandbox ents =
        renameFile newIndexName $ indexTar sandbox
     where
       pth = localRepoPath sandbox
-      withTmpIndex = bracket (openTempFile pth indexTarBase) (hClose . snd)
+      withTmpIndex = Ex.bracket (openTempFile pth indexTarBase) (hClose . snd)
 
 -- |Merge two lists of tar entries, filtering out the entries from the
 -- original list that will be duplicated by the second list of
@@ -158,7 +154,7 @@ toIndexEntry pkgId c = right toEnt $ T.toTarPath False (indexName pkgId)
 -- entries.
 readExistingIndex :: Sandbox a -> IO (Either String [T.Entry])
 readExistingIndex sandbox =
-    readIndexFile `catch` \e ->
+    readIndexFile `Ex.catch` \e ->
         if isDoesNotExistError e
         then return $ Right []
         else ioError e
@@ -210,7 +206,7 @@ installTarball flgs sandbox src pkgId pkgDesc =
       dest = localRepoPath sandbox </> tarballName pkgId
       makeSDist fn = do
         debug (getVerbosity flgs) $ "Running cabal sdist in " ++ fn
-        bracket getCurrentDirectory setCurrentDirectory $ \_ -> do
+        Ex.bracket getCurrentDirectory setCurrentDirectory $ \_ -> do
                     setCurrentDirectory fn
                     -- If the build-type is custom, run 'configure'
                     -- and invoke the generated setup program.
@@ -240,7 +236,7 @@ installTarball flgs sandbox src pkgId pkgDesc =
 downloadTarball :: URI -> IO (Either String FilePath)
 downloadTarball u = do
   tmpLoc <- getTemporaryDirectory
-  bracket (openTempFile tmpLoc "package-.tar.gz") (hClose . snd) $ \(fn, h) ->
+  Ex.bracket (openTempFile tmpLoc "package-.tar.gz") (hClose . snd) $ \(fn, h) ->
       do httpRes <- simpleHTTP $ mkRequest GET u
          case httpRes of
            Left err -> return $ Left $ show err
@@ -304,7 +300,7 @@ displayPackageName = id
 -- file
 processDirectory :: V.Verbosity -> FilePath
                  -> IO (Either String (PackageIdentifier, L.ByteString, PackageDescription))
-processDirectory v d = go `catch` \e ->
+processDirectory v d = go `Ex.catch` \e ->
                      if expected e
                      then return $ Left $ show e
                      else ioError e
