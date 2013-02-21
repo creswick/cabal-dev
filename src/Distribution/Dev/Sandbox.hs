@@ -6,6 +6,8 @@ module Distribution.Dev.Sandbox
     , UnknownVersion
     , cabalConf
     , getVersion
+    , indexCache
+    , indexCacheBase
     , indexTar
     , indexTarBase
     , localRepoPath
@@ -121,6 +123,12 @@ resolveSandbox cfg = do
   newSandbox v relSandbox
 
 -- |The name of the cabal-install package index
+indexCacheBase :: FilePath
+indexCacheBase = "00-index.cache"
+
+indexCache :: Sandbox a -> FilePath
+indexCache sb = localRepoPath sb </> indexCacheBase
+
 indexTarBase :: FilePath
 indexTarBase = "00-index.tar"
 

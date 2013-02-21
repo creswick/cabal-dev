@@ -50,6 +50,7 @@ import System.Directory                      ( getDirectoryContents
                                              , setCurrentDirectory
                                              , createDirectoryIfMissing
                                              , getTemporaryDirectory
+                                             , removeFile
                                              )
 import System.Exit                           ( ExitCode(..) )
 import System.FilePath                       ( takeExtension, takeBaseName
@@ -71,7 +72,7 @@ import qualified Distribution.Verbosity      as V
 import Distribution.Dev.Command ( CommandActions(..), CommandResult(..) )
 import Distribution.Dev.Flags   ( Config, getVerbosity )
 import Distribution.Dev.Sandbox ( resolveSandbox, localRepoPath
-                                , Sandbox, indexTar, indexTarBase
+                                , Sandbox, indexTar, indexTarBase, indexCache
                                 )
 
 import Distribution.Simple.Utils ( debug, notice )
@@ -120,6 +121,7 @@ addSources flgs fns = do
                  return CommandOk
 
 -- |Atomically write an index tarball in the supplied directory
+-- and invalidates the cache
 writeIndex :: Sandbox a -- ^The local repository path
            -> [T.Entry] -- ^The index entries
            -> IO ()
@@ -130,6 +132,10 @@ writeIndex sandbox ents =
                          hFlush h
                          return fn
        renameFile newIndexName $ indexTar sandbox
+       removeFile (indexCache sandbox) `Ex.catch` \e ->
+         if isDoesNotExistError e
+         then return ()
+         else ioError e
     where
       pth = localRepoPath sandbox
       withTmpIndex = Ex.bracket (openTempFile pth indexTarBase) (hClose . snd)
