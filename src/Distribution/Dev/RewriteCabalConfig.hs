@@ -20,15 +20,12 @@ module Distribution.Dev.RewriteCabalConfig
     )
 where
 
-#ifdef NO_PRELUDE_CATCH
-import Control.Exception         ( catch, IOException )
-#endif
-
-import Control.Applicative       ( Applicative, pure, (<$>) )
-import Data.Maybe                ( fromMaybe )
-import Data.Traversable          ( traverse, Traversable )
-import Distribution.ParseUtils   ( Field(..), readFields, ParseResult(..) )
-import Distribution.Simple.Utils ( readUTF8File )
+import qualified Control.Exception as Ex ( catch, IOException )
+import Control.Applicative               ( Applicative, pure, (<$>) )
+import Data.Maybe                        ( fromMaybe )
+import Data.Traversable                  ( traverse, Traversable )
+import Distribution.ParseUtils           ( Field(..), readFields, ParseResult(..) )
+import Distribution.Simple.Utils         ( readUTF8File )
 import Text.PrettyPrint.HughesPJ
 
 data Rewrite = Rewrite { homeDir          :: FilePath
@@ -44,14 +41,10 @@ readConfig s = case readFields s of
 
 -- XXX: we should avoid this lazy IO that leaks a file handle.
 readConfigF :: FilePath -> IO (Either String [Field])
-readConfigF fn = (readConfig <$> readUTF8File fn) `catch` handler
+readConfigF fn = (readConfig <$> readUTF8File fn) `Ex.catch` handler
   where
-#ifdef NO_PRELUDE_CATCH
-    handler :: IOException -> IO (Either String [Field])
+    handler :: Ex.IOException -> IO (Either String [Field])
     handler  = return . Left . show
-#else
-    handler  = return . Left . show
-#endif
 
 readConfigF_ :: FilePath -> IO [Field]
 readConfigF_ fn = either error id <$> readConfigF fn
