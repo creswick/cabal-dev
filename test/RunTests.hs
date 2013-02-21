@@ -162,14 +162,6 @@ addSourceStaysSandboxed v cabalDev dirName =
       -- with an empty package index
       withCabalDev assertExitsFailure ["install", pkgStr]
 
-      -- XXX: https://github.com/haskell/cabal/issues/1213
-      -- Workaround for a cabal-install bug where the index cache
-      -- may be considered valid when it isn't due to a race condition
-      -- with the modification time.
-      let cacheFile = indexTar sb `replaceExtension` "cache"
-      cacheExists <- doesFileExist cacheFile
-      when cacheExists $ removeFile cacheFile
-
       withCabalDev assertExitsSuccess ["add-source", packageDir]
 
       -- Do the installation. Now this library should be registered
