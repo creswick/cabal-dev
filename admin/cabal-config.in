@@ -61,22 +61,22 @@ install-dirs user
   prefix: ./
   -- bindir: $prefix/bin
   -- libdir: $prefix/lib
-  -- libsubdir: $pkgid/$compiler
-  -- libexecdir: $prefix/libexec
+  libsubdir: $pkgid/$compiler
+  libexecdir: $prefix/libexec
   -- datadir: $prefix/share
   -- datasubdir: $pkgid
-  -- docdir: $datadir/doc/$pkgid
+  docdir: $datadir/doc/$pkgid
   -- htmldir: $docdir/html
   -- haddockdir: $htmldir
 
 install-dirs global
   prefix: ./
   -- bindir: $prefix/bin
-  -- libdir: $prefix/lib
-  -- libsubdir: $pkgid/$compiler
+  libdir: $prefix/lib
+  libsubdir: $pkgid/$compiler
   -- libexecdir: $prefix/libexec
   -- datadir: $prefix/share
   -- datasubdir: $pkgid
-  -- docdir: $datadir/doc/$pkgid
+  docdir: $datadir/doc/$pkgid
   -- htmldir: $docdir/html
   -- haddockdir: $htmldir
