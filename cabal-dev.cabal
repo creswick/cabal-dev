@@ -46,14 +46,14 @@ Author:              Josh Hoyt, Jonathan Daugherty, Rogan Creswick
 Maintainer:          joshhoyt@gmail.com, jtd@galois.com, creswick@galois.com
 Homepage:            http://github.com/creswick/cabal-dev
 Bug-Reports:         http://github.com/creswick/cabal-dev/issues
-Copyright:           2010-2012 Galois, Inc.
+Copyright:           2010-2013 Galois, Inc.
 Category:            Development
 Build-type:          Custom
 Cabal-version:       >=1.6
 Data-Files:
   admin/cabal-config.in,
   admin/00-index.tar
-Tested-with: GHC == 6.12.3, GHC == 6.10.4, GHC == 7.0.3, GHC == 7.4.1
+Tested-with: GHC == 7.4.1, GHC == 7.6.1
 
 source-repository head
   type:        git
