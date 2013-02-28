@@ -17,16 +17,8 @@ Description:         cabal-dev is a tool for managing development builds of
                      databases.
                      .
                      If your build depends on patched or unreleased libraries,
-                     you can add them to your sandboxed build environment so
-                     they can be installed by @cabal-dev@ or @cabal@. Just run:
-                     .
-                     > cabal-dev add-source /path/to/source/code
-                     .
-                     @cabal-dev add-source@ also supports importing tarballs
-                     into a local cabal repository.
-                     .
-                     Alternatively, install unreleased dependencies into the
-                     target cabal-dev sandbox instead of using @add-source@:
+                     you can add them to your sandboxed build environment by 
+                     installing them to the sandbox directly:so
                      .
                      > cd /path/to/dependency
                      > cabal-dev install --sandbox=/path/to/sandbox
