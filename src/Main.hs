@@ -21,7 +21,7 @@ import Control.Monad.Trans.State ( evalState, gets, modify )
 import Distribution.Dev.Command ( CommandActions(..), CommandResult(..) )
 import Distribution.Dev.Flags ( parseGlobalFlags, helpRequested, globalOpts
                               , GlobalFlag(Version), getOpt'', fromFlags
-                              , getVerbosity, Config, getSandbox
+                              , getVerbosity, Config, getSandbox, getEnvVars
                               )
 import qualified Distribution.Dev.AddSource as AddSource
 import qualified Distribution.Dev.Ghci as Ghci
@@ -97,13 +97,14 @@ printNumericVersion = do
 
 main :: IO ()
 main = do
+  envConf <- getEnvVars
   (globalFlags, args, errs) <- parseGlobalFlags `fmap` getArgs
   unless (null errs) $ do
          mapM_ putStrLn errs
          putStr =<< globalUsage
          exitWith (ExitFailure 1)
 
-  let cfg = fromFlags globalFlags
+  let cfg = fromFlags envConf globalFlags
 
   -- add sandbox bin dir to PATH, so that custom preprocessors that are
   -- installed into the sandbox are found

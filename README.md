@@ -22,7 +22,9 @@ dependencies, which are built and installed into a package database
 within the sandbox.  The first cabal-dev build of a project typically
 takes substantially longer than subsequent builds--don't worry, the
 artifacts created will be re-used on subsequent builds unless you
-remove the sandbox, or specify a different sandbox (with --sandbox=).
+remove the sandbox, or specify a different sandbox (with --sandbox= at
+the command line or the CABAL_SANDBOX environment variable; the
+command line flag takes precedence).
 
 The project is then built, utilizing the sandboxed package database
 rather than the user database.  (The GHC system database *is* still
