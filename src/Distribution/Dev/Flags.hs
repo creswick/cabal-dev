@@ -167,11 +167,11 @@ getSandbox = fromMaybe defaultSandbox . cfgSandbox
 sandboxSpecified :: Config -> Bool
 sandboxSpecified = isJust . cfgSandbox
 
-data Config = Config { cfgVerbosity   :: Maybe Verbosity
-                     , cfgCabalConfig :: Maybe FilePath
-                     , cfgSandbox     :: Maybe FilePath
-                     , cfgCabalInstall :: Maybe FilePath
-                     , passthroughArgs :: [String]
+data Config = Config { cfgVerbosity     :: Maybe Verbosity
+                     , cfgCabalConfig   :: Maybe FilePath
+                     , cfgSandbox       :: Maybe FilePath
+                     , cfgCabalInstall  :: Maybe FilePath
+                     , passthroughArgs  :: [String]
                      , extraConfigFiles :: [String]
                      , useUserConfig :: Bool
                      }
@@ -194,7 +194,7 @@ fromFlag (Verbose s)          = mempty { cfgVerbosity = v }
             Just _         -> Nothing -- XXX: we are ignoring
                                       -- verbosity parse errors
 fromFlag (CabalInstallArg a) = mempty { passthroughArgs = [a] }
-fromFlag _             = mempty
+fromFlag _                   = mempty
 
 fromFlags :: [GlobalFlag] -> Config
 fromFlags = foldMap fromFlag
