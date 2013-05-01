@@ -14,6 +14,7 @@ module Distribution.Dev.Flags
     , extraConfigFiles
     , useUserConfig
 
+    , getEnvVars
     , globalOpts
     , parseGlobalFlags
     , helpRequested
@@ -21,18 +22,22 @@ module Distribution.Dev.Flags
     )
 where
 
-import Control.Monad          ( mplus )
+import Control.Monad          ( liftM, mplus )
 import Data.Monoid            ( Monoid(..) )
 import Data.List              ( intercalate )
-import Data.Maybe             ( fromMaybe, isJust, maybeToList, listToMaybe )
+import Data.Maybe             ( fromMaybe, isJust, maybeToList, listToMaybe,
+                                catMaybes )
 import Data.Foldable          ( foldMap )
 import System.FilePath        ( (</>) )
+import System.IO.Error        ( isDoesNotExistError )
+import Control.Exception      ( tryJust )
 import Distribution.ReadE     ( runReadE )
 import Distribution.Verbosity ( Verbosity, normal, verbose, flagToVerbosity )
 import Paths_cabal_dev        ( getDataFileName )
 import System.Console.GetOpt  ( OptDescr(..), ArgOrder(..), ArgDescr(..)
                               , getOpt', getOpt
                               )
+import System.Environment     ( getEnv )
 
 import qualified Distribution.Dev.CabalInstall as CI
 
@@ -131,6 +136,19 @@ getOpt'' opts args =
       impossible -> error $
                     "Impossible outcome from break: " ++ show impossible
 
+envVars :: [(String, String -> GlobalFlag)]
+envVars = [("CABAL_SANDBOX", Sandbox)]
+
+getEnvVar :: (String, String -> GlobalFlag) -> IO (Maybe GlobalFlag)
+getEnvVar (name, parser) = liftM (liftM parser . eitherToMaybe) $
+                           tryJust checkError (getEnv name)
+    where checkError e = if isDoesNotExistError e then Just () else Nothing
+          eitherToMaybe (Right a) = Just a
+          eitherToMaybe _         = Nothing
+
+getEnvVars :: IO Config
+getEnvVars = liftM (foldMap fromFlag . catMaybes) $ mapM getEnvVar envVars
+
 parseGlobalFlags :: [String] -> ([GlobalFlag], [String], [String])
 parseGlobalFlags args = getOpt'' (globalOpts ++ defs) args
     where
@@ -167,11 +185,11 @@ getSandbox = fromMaybe defaultSandbox . cfgSandbox
 sandboxSpecified :: Config -> Bool
 sandboxSpecified = isJust . cfgSandbox
 
-data Config = Config { cfgVerbosity   :: Maybe Verbosity
-                     , cfgCabalConfig :: Maybe FilePath
-                     , cfgSandbox     :: Maybe FilePath
-                     , cfgCabalInstall :: Maybe FilePath
-                     , passthroughArgs :: [String]
+data Config = Config { cfgVerbosity     :: Maybe Verbosity
+                     , cfgCabalConfig   :: Maybe FilePath
+                     , cfgSandbox       :: Maybe FilePath
+                     , cfgCabalInstall  :: Maybe FilePath
+                     , passthroughArgs  :: [String]
                      , extraConfigFiles :: [String]
                      , useUserConfig :: Bool
                      }
@@ -194,7 +212,7 @@ fromFlag (Verbose s)          = mempty { cfgVerbosity = v }
             Just _         -> Nothing -- XXX: we are ignoring
                                       -- verbosity parse errors
 fromFlag (CabalInstallArg a) = mempty { passthroughArgs = [a] }
-fromFlag _             = mempty
+fromFlag _                   = mempty
 
-fromFlags :: [GlobalFlag] -> Config
-fromFlags = foldMap fromFlag
+fromFlags :: Config -> [GlobalFlag] -> Config
+fromFlags envConf = (mappend envConf) . foldMap fromFlag
