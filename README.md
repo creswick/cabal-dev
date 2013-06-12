@@ -4,7 +4,7 @@
 Performing consistent builds is critical in software development, but
 the current system of per-user and per-system GHC package databases
 interferes with this need for consistency.  It is difficult to
-preciesly identify the dependencies of a given project, and changes
+precisely identify the dependencies of a given project, and changes
 necessary to enable one project to build may render another project
 inoperable.  If each project had a separate package database, each
 project could be built in a sandbox.
