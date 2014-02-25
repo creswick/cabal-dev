@@ -1,3 +1,5 @@
+**UPDATE:** We recommend that people move away from cabal-dev, now that cabal-install supports sandboxes natively (in versions >= 1.18). Here's a blog post that describes how to use cabal-install sandboxes: http://coldwa.st/e/blog/2013-07-30-Cabal-sandbox.html
+
 # Cabal Dev
 ## Motivation
 
